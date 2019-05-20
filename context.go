@@ -81,6 +81,22 @@ func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	return
 }
 
+//Redirect 跳转
+func (ctx *Context) Redirect(httpstatus int, addr string) {
+	if !(httpstatus > 299 && httpstatus < 400) {
+		httpstatus = http.StatusPermanentRedirect
+	}
+	ctx.statuscode = httpstatus
+	http.Redirect(ctx.w, ctx.r, addr, httpstatus)
+}
+
+//SetCookies 设置小甜饼
+func (ctx *Context) SetCookies(cookies ...*http.Cookie) {
+	for _, cookie := range cookies {
+		http.SetCookie(ctx.w, cookie)
+	}
+}
+
 //ResponseHeader 头部
 func (ctx *Context) ResponseHeader() http.Header {
 	return ctx.w.Header()

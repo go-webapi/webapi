@@ -2,7 +2,6 @@
  */package webapi
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -53,14 +52,6 @@ func init() {
 }
 
 type (
-	//endpoint 注册节点
-	endpoint struct {
-		Params   *reflect.Type //来自查询的字段
-		Entity   *reflect.Type //来自实体的字段
-		Context  reflect.Type  //上下文
-		Function reflect.Value //实现函数
-	}
-
 	//Config 配置
 	Config struct {
 		//UserLowerLetter 使用小写 Path
@@ -76,8 +67,9 @@ type (
 		conf     Config
 
 		//堆栈数据
-		basepath string
-		pstack   []Predecessor
+		basepath     string
+		pstack       []Predecessor
+		ErrorHandler func(error) interface{}
 	}
 )
 
@@ -89,6 +81,9 @@ func NewHost(conf Config, predecessors ...Predecessor) (host *Host) {
 
 		basepath: "",
 		pstack:   predecessors,
+	}
+	if !conf.DisableAutoReport {
+		os.Stdout.WriteString("Registration Info:\r\n")
 	}
 	return
 }
@@ -145,7 +140,17 @@ func (host *Host) Register(basePath string, controller Controller, predecessors 
 	{
 		if alias, isAlias := interface{}(controller).(aliasController); isAlias {
 			asideDict = internalAliasControllerMethods
-			basePath += strings.Replace(alias.RouteAlias(), "/", "", -1)
+			aliasName := alias.RouteAlias()
+			if len(aliasName) > 0 && aliasName[0] == '/' {
+				aliasName = aliasName[1:]
+			}
+			if len(aliasName) > 0 && aliasName[len(aliasName)-1] == '/' {
+				aliasName = aliasName[:len(aliasName)-1]
+			}
+			if len(aliasName) == 0 {
+				return errors.New("cannot set empty alias")
+			}
+			basePath += aliasName
 		} else {
 			temp := typ
 			for temp.Kind() == reflect.Ptr {
@@ -203,12 +208,16 @@ func (host *Host) Register(basePath string, controller Controller, predecessors 
 				})
 			}
 			if isBody && argindex != 2 {
-				ep.Entity = &arg
+				ep.Entity = &param{
+					Type: arg,
+				}
 			} else {
 				if ep.Params != nil {
 					return errors.New("cannot assign 2 sets from query")
 				}
-				ep.Params = &arg
+				ep.Params = &param{
+					Type: arg,
+				}
 			}
 		}
 		if len(methods) == 0 {
@@ -219,7 +228,7 @@ func (host *Host) Register(basePath string, controller Controller, predecessors 
 			}
 		}
 		handler := func(ctx *Context) {
-			var reply = runEndpoint(&ep, ctx)
+			var reply = host.runEndpoint(&ep, ctx)
 			if ctx.statuscode == 0 && len(reply) > 0 {
 				ctx.Reply(http.StatusOK, reply[0])
 			}
@@ -251,9 +260,6 @@ func (host *Host) AddEndpoint(method string, basePath string, handler HTTPHandle
 		if len(basePath) == 0 || basePath[0] != '/' {
 			basePath = "/" + basePath
 		}
-		if basePath[len(basePath)-1] != '/' {
-			basePath += "/"
-		}
 		basePath = host.basepath + basePath
 	}
 	if _, existed := host.handlers[method]; !existed {
@@ -275,6 +281,11 @@ func (host *Host) AddEndpoint(method string, basePath string, handler HTTPHandle
 
 //ServeHTTP 启动 HTTP 服务
 func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if host.ErrorHandler == nil {
+		host.ErrorHandler = func(err error) interface{} {
+			return err.Error()
+		}
+	}
 	if r.Body != nil {
 		defer r.Body.Close()
 	}
@@ -317,7 +328,7 @@ func (host *Host) Report() (router map[string][]string) {
 }
 
 //runEndpoint 执行端点
-func runEndpoint(point *endpoint, ctx *Context) (objs []interface{}) {
+func (host *Host) runEndpoint(point *endpoint, ctx *Context) (objs []interface{}) {
 	args := make([]reflect.Value, 0)
 	if point.Context != nil {
 		obj, callback := createObj(point.Context)
@@ -325,56 +336,34 @@ func runEndpoint(point *endpoint, ctx *Context) (objs []interface{}) {
 		args = append(args, callback(obj))
 	}
 	if point.Entity != nil {
-		obj, callback := createObj(*point.Entity)
 		body, _ := ioutil.ReadAll(ctx.r.Body)
 		if len(body) > 0 {
 			if ctx.Crypto != nil {
 				body, _ = ctx.Crypto.Decrypt(body)
 			}
 		}
-		if len(body) > 0 {
-			entityObj := obj.Addr().Interface()
-			json.Unmarshal(body, entityObj)
-			obj = callback(reflect.ValueOf(entityObj))
-		} else {
-			obj = reflect.Zero(*point.Entity)
+		obj, err := point.Entity.Load(body)
+		if obj == nil {
+			if err != nil {
+				ctx.Reply(http.StatusBadRequest, host.ErrorHandler(err), true)
+			} else {
+				ctx.Reply(http.StatusBadRequest)
+			}
+			return
 		}
-		args = append(args, obj)
+		args = append(args, *obj)
 	}
 	if point.Params != nil {
-		obj, callback := createObj(*point.Params)
-		queries := ctx.r.URL.Query()
-		typ := obj.Type()
-		for fieldIndex := 0; fieldIndex < typ.NumField(); fieldIndex++ {
-			field := obj.Field(fieldIndex)
-			if field.CanSet() {
-				ftyp := typ.Field(fieldIndex)
-				if name := ftyp.Tag.Get("json"); len(name) > 0 && name != "-" {
-					value := queries.Get(name)
-					switch field.Type().Kind() {
-					case reflect.String:
-						field.SetString(value)
-						break
-					case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64:
-						val, _ := strconv.ParseInt(value, 10, 64)
-						field.SetInt(val)
-						break
-					case reflect.Uint, reflect.Uint32, reflect.Uint64, reflect.Uint8, reflect.Uint16:
-						val, _ := strconv.ParseUint(value, 10, 64)
-						field.SetUint(val)
-						break
-					case reflect.Float32, reflect.Float64:
-						val, _ := strconv.ParseFloat(value, 64)
-						field.SetFloat(val)
-						break
-					case reflect.Bool:
-						field.SetBool(strings.ToLower(value) == "true")
-						break
-					}
-				}
+		obj, err := point.Params.Load(ctx.r.URL.Query())
+		if obj == nil {
+			if err != nil {
+				ctx.Reply(http.StatusBadRequest, host.ErrorHandler(err), true)
+			} else {
+				ctx.Reply(http.StatusBadRequest)
 			}
+			return
 		}
-		args = append(args, callback(obj))
+		args = append(args, *obj)
 	}
 	result := point.Function.Call(args)
 	objs = make([]interface{}, len(result))
@@ -382,22 +371,6 @@ func runEndpoint(point *endpoint, ctx *Context) (objs []interface{}) {
 		objs[index] = res.Interface()
 	}
 	return
-}
-
-//createObj 创建可写对象，并返回一个转化它为设定值的函数
-func createObj(typ reflect.Type) (reflect.Value, func(reflect.Value) reflect.Value) {
-	level := 0
-	for typ.Kind() == reflect.Ptr {
-		level++
-		typ = typ.Elem()
-	}
-	obj := reflect.New(typ).Elem()
-	return obj, func(v reflect.Value) reflect.Value {
-		for ; level > 0; level-- {
-			obj = obj.Addr()
-		}
-		return obj
-	}
 }
 
 //pipeline 工作管线

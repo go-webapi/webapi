@@ -25,8 +25,15 @@ type (
 		Complete() error
 	}
 
+	//Checkable 数据可检查性
+	Checkable interface {
+		Check() error
+	}
+
 	//Controller 控制器
 	Controller interface {
+		Redirect(int, string)
+		SetCookies(...*http.Cookie)
 		Reply(int, ...interface{}) error
 		Write(int, []byte) error
 		ResponseHeader() http.Header

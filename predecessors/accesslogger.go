@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
-	"tools/webapi"
+
+	"github.com/johnwiichang/webapi"
 )
 
 type (
@@ -39,7 +40,7 @@ func (logger *AccessLogger) Invoke(ctx *webapi.Context, next webapi.HTTPHandler)
 	clientIP, _, _ := net.SplitHostPort(strings.TrimSpace(ctx.GetRequest().RemoteAddr))
 	method := ctx.GetRequest().Method
 	//采用自定义写文件方式
-	logger.accesslogger.Write("[%s]\t%d\t%s\t%s -> %s\t%s", start.Format("2006-01-02 15:04:05"), ctx.StatusCode(), method, clientIP, path, latency)
+	logger.accesslogger.Write("[%s]\t%s/%d\t%s -> %s\t%s", start.Format("2006-01-02 15:04:05"), method, ctx.StatusCode(), clientIP, path, latency)
 }
 
 type (
