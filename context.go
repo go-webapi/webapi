@@ -50,7 +50,7 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 			}
 		}
 	}
-	if notify2User {
+	if notify2User && len(obj) > 0 {
 		if str, isStr := obj[0].(string); isStr {
 			data = []byte(str)
 		} else if bytearr, isBytearr := obj[0].([]byte); isBytearr {
