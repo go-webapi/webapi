@@ -1,4 +1,4 @@
-package predecessors
+package middlewares
 
 import (
 	"bytes"

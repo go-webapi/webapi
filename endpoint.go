@@ -1,115 +1,91 @@
 package webapi
 
 import (
-	"encoding/json"
 	"errors"
-	"net/url"
-	"reflect"
 	"strconv"
 	"strings"
 )
 
 type (
-	//endpoint 注册节点
 	endpoint struct {
-		Params   *param        //来自查询的字段
-		Entity   *param        //来自实体的字段
-		Context  reflect.Type  //上下文
-		Function reflect.Value //实现函数
-	}
-
-	param struct {
-		reflect.Type
+		handler   httpHandler
+		endpoints map[string]*endpoint
 	}
 )
 
-func (paramTyp *param) loadFromBytes(body []byte) (*reflect.Value, error) {
-	obj, callback := createObj(paramTyp.Type)
-	if len(body) > 0 {
-		entityObj := obj.Addr().Interface()
-		json.Unmarshal(body, entityObj)
-		if checkObj, checkable := entityObj.(Checkable); checkable {
-			if err := checkObj.Check(); err != nil {
-				return nil, err
-			}
-		}
-		obj = callback(reflect.ValueOf(entityObj))
-	} else {
-		obj = reflect.Zero(paramTyp.Type)
+//Add 添加 HTTP 端点
+func (point *endpoint) Add(path string, handler httpHandler) error {
+	if point.endpoints == nil {
+		point.endpoints = map[string]*endpoint{}
 	}
-	return &obj, nil
+	var current = point
+	if !strings.Contains(path, "{string}") && !strings.Contains(path, "{digits}") && !strings.Contains(path, "{float}") {
+		current.endpoints[path] = &endpoint{handler: handler} //便捷注册法
+	} else {
+		for _, address := range strings.Split(path, "/")[1:] {
+			if _, existed := current.endpoints[address]; !existed {
+				current.endpoints[address] = &endpoint{endpoints: map[string]*endpoint{}}
+			}
+			current = current.endpoints[address]
+		}
+		if current.handler != nil {
+			return errors.New("endpoint already existed")
+		}
+		current.handler = handler
+	}
+	return nil
 }
 
-func (paramTyp *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
-	obj, callback := createObj(paramTyp.Type)
-	typ := obj.Type()
-	for fieldIndex := 0; fieldIndex < typ.NumField(); fieldIndex++ {
-		field := obj.Field(fieldIndex)
-		if field.CanSet() {
-			ftyp := typ.Field(fieldIndex)
-			name := ftyp.Tag.Get("json")
-			if len(name) == 0 {
-				name = ftyp.Name
+//Find 查找 HTTP 端点
+func (point *endpoint) Find(path string) (httpHandler, []string) {
+	if point.endpoints == nil {
+		point.endpoints = map[string]*endpoint{}
+	}
+	if handler, existed := point.endpoints[path]; existed {
+		return handler.handler, nil
+	}
+	var current = point
+	args := []string{}
+	var paths = strings.Split(path, "/")[1:]
+	if paths[len(paths)-1] == "index" || paths[len(paths)-1] == "Index" {
+		paths = paths[:len(paths)-1]
+	}
+	for _, path := range paths {
+		if len(current.endpoints) == 0 {
+			break
+		}
+		obj, existed := current.endpoints[path]
+		if !existed {
+			if len(path) == 0 {
+				continue
 			}
-			if len(name) > 0 && name != "-" {
-				value := queries.Get(name)
-				switch field.Type().Kind() {
-				case reflect.String:
-					field.SetString(value)
-					break
-				case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64:
-					val, _ := strconv.ParseInt(value, 10, 64)
-					field.SetInt(val)
-					break
-				case reflect.Uint, reflect.Uint32, reflect.Uint64, reflect.Uint8, reflect.Uint16:
-					val, _ := strconv.ParseUint(value, 10, 64)
-					field.SetUint(val)
-					break
-				case reflect.Float32, reflect.Float64:
-					val, _ := strconv.ParseFloat(value, 64)
-					field.SetFloat(val)
-					break
-				case reflect.Bool:
-					field.SetBool(strings.ToLower(value) == "true")
-					break
+			digit, isDigit := strconv.ParseInt(path, 10, 64)
+			decimal, isDecimal := strconv.ParseFloat(path, 64)
+			if isDigit == nil && float64(digit) == decimal {
+				obj, existed = current.endpoints[`{digits}`]
+				if existed {
+					current = obj
+					args = append(args, path)
+					continue
 				}
 			}
-		}
-	}
-	{
-		objInstance := obj.Addr().Interface()
-		if checkObj, checkable := objInstance.(Checkable); checkable {
-			if err := checkObj.Check(); err != nil {
-				return nil, err
+			if isDecimal == nil {
+				obj, existed = current.endpoints[`{float}`]
+				if existed {
+					current = obj
+					args = append(args, path)
+					continue
+				}
 			}
+			if obj, existed = current.endpoints[`{string}`]; existed {
+				current = obj
+			} else {
+				break
+			}
+			args = append(args, path)
+		} else {
+			current = obj
 		}
-		obj = reflect.ValueOf(objInstance)
 	}
-	obj = callback(obj)
-	return &obj, nil
-}
-
-func (typ *param) Load(obj interface{}) (*reflect.Value, error) {
-	if b, isBytes := obj.([]byte); isBytes {
-		return typ.loadFromBytes(b)
-	} else if values, isValues := obj.(url.Values); isValues {
-		return typ.loadFromValues(values)
-	}
-	return nil, errors.New("cannot accept input type " + reflect.TypeOf(obj).Name())
-}
-
-//createObj 创建可写对象，并返回一个转化它为设定值的函数
-func createObj(typ reflect.Type) (reflect.Value, func(reflect.Value) reflect.Value) {
-	level := 0
-	for typ.Kind() == reflect.Ptr {
-		level++
-		typ = typ.Elem()
-	}
-	obj := reflect.New(typ).Elem()
-	return obj, func(v reflect.Value) reflect.Value {
-		for ; level > 0; level-- {
-			obj = obj.Addr()
-		}
-		return obj
-	}
+	return current.handler, args
 }

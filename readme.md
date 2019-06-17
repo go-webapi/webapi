@@ -7,172 +7,188 @@
  
 ```
 
-> WebAPI 是 CandyFramework v2 的默认底层主机支持。
->
-> 借助 WebAPI 我们将 CandyFramework 的规范约束从书面建议变为了编译检查。
->
-> 我们很高兴能够与您分享我们的 Go 见解，酷码似飞。
+WebAPI 是一个适用于 Golang 的 Web API 服务开发的基础库。使用 WebAPI 可以有效降低编码出错的概率并回避无聊的重复代码。WebAPI for Golang 灵感来源于 Microsoft ASP.NET Core，所以如果对于 .NET 或者 JavaEE 熟悉的开发者而言，定会游刃有余。
 
-## 承前启后
+## 能力
 
-CandyFramework v1 使用了 Router2 支持底层。虽然 Router 提供了简洁有力的支持，并且在各个方面表现上相当优异，但是因为 Router2 出现了 *CFBA-2019:01 updated 1.01 source code* 缺陷更新并随着框架演进不再与 CandyFramework 的方向高度契合，所以我们立足于几个要点更改了 Router 并为 CandyFramework 提供强劲支持：
+### 自动路由注册与复合控制器
 
-1. 自动路由注册
+**聚焦业务核心回避无关的规则，DDD 与 MVVM 等设计模式高度相容。不同业务模块拥有自身控制器（组），支持模块细分与多模块统一整合的设计（允许多人协同）。基于约定的自动路由注册降低冗余代码，提高设计效率同时回避公开地址与内部实现失去同步的可能。**
 
-   我们留意到，在以前 Router2 的支撑底层时，端点（*Endpoint*）的注册使用的方法主要有两种：
-
-   1. 含保护的传递注册；
-   2. 公开方法的裸注册。
-
-   这两种方法都面临巨大的**手写**注册行为，端点与方法名容易出现不一致。并且后者面临私有领域数据被多重暴露和命名空间重叠的问题。另外，这两种注册行为可能导致同一领域（*Domain*）的业务端点注册到其他父端点的可能，在代码维护上，增大开发者压力。
-
-2. 数据自动协作
-
-   在多次使用 CandyFramework 的实践中，我们发现在操作数据序列化、反序列化的行为上，我们花费了很多的时间，即使提供了中途加密（*Midway Encryption*）套件依然存在大量的序列化检查。在这样的行为上，我们需要思考如何简化这些业务压力。
-
-3. 高灵活中间件
-
-   中间件（*Middleware*）提供的定义是一个函数签名。虽然中间件依然可以提供 `SetMiddleware()` 类似的函数来作为临时装配器，但是不容忽视的是中间件之间的隔离程度过低。我们虽然建议通过 package 来区别中间件，但是因为编写人员的习惯不同，容易造成中间件混杂。我们需要去规范和约束这样的行为以降低这样对于软件质量带来的风险。
-
-## 继往开来
-
-所以我们在 WebAPI 中提供了一系列的革新用来帮助开发者解决种种问题。
-
-### 自动路由注册
-
-我们现在提供这样的路由编写方式：
+声明控制器：
 
 ```go
-package controller
-
-type User struct {
+type Article struct {
 	webapi.Controller
 }
+```
 
-func (u *User) SayHi() string {
-	return "Hi"
+声明接入点：
+
+```go
+func (article *Article) Show(query struct {
+  GUID string `json:"guid"`
+}) string {
+	return fmt.Sprintf("you are reading post-%s", query.GUID)
 }
 ```
 
-开发者可以直接使用 `return` 语句返回他们预期的回复值。这样即使写到最后忘记写入到上下文也不用出现空回复或者 `panic`。
+> WebAPI 遵循 Golang 原则，但凡可访问的方法（大写字母开头的函数）均会被注册为 API 接入点。
 
-注册方式很简单：
+接入点会被注册为 `/article/show?guid=[guid]`，如果有多个控制器处理不同业务，那么可以通过 `RouteAlias() string` 方法来指定控制器别名：
 
 ```go
-var host = webapi.NewHost(webapi.Config{})
-host.Register("/api", &User{})
+type article struct {
+	webapi.Controller
+	id uint
+}
+
+func (article *article) RouteAlias() string {
+	return "article"
+}
 ```
 
-然后上面的方法将会被自动注册：
+然后不管在 `article` 还是 `Article` 下的方法均会注册到 `/article` 下。不过需要注意的是，此类注册器需要回避重名问题。不过在运行时 WebAPI 会针对重名方法做出致命警告 (panic)。
+
+> 使用时，不妨将各个业务模块细分给不同的人去完成。最后通过 `RouteAlias` 可以轻松将他们整合在一起。
+
+### 查询/正文自动序列化与反序列化支持
+
+**完全消除在业务逻辑中的正文读取、序列化/反序列化、查询检索与转化，借助于中间件，甚至还可以配置 MsgPack 等非系统内建/私有化序列器。**
+
+我们使用  `curl` 访问一下刚才的 API：
 
 ```bash
-[GET]	/api/User/SayHi
+~ curl http://localhost:9527/article/show\?guid\=79526
+#you are reading post-79526
 ```
 
-然后使用 `curl` 访问它，会得到：
-
-```
-Hi
-```
-
-的输出内容。
-
-#### 控制器（*Controller*）
-
-在 Router2 中我们遇到了因为扁平化的注册导致的种种问题后，我们重新引入了控制器（*Controller*）。控制器的声明很简单，参考上面的定义我们只需要在结构中引入 `webapi.Controller` 即可。
-
-控制器具有下面的几个默认约定：
-
-- 控制器名是为注册基地址。
-- 控制器的第一个返回值在上下文没有返回的时候会被写入到返回正文。
-- 控制器内注册点的参数最多为两个，且当参数为两个且没有来源声明的条件下会被默认注册为 `POST`。
-- 控制器内注册点的参数为零或者仅一个的时候，在没有参数来源声明的条件下会被默认注册为 `GET`。
-
-但是也允许显式告知：
-
-- 基地址
-
-  可以使用 `RouteAlias() string` 方法来显式指定基地址。例如：
-
-  ```go
-  func (u *User) RouteAlias() string {
-  	return "usr"
-  }
-  ```
-
-  方法注册结果为：
-
-  ```bash
-  [GET]	/api/usr/SayHi
-  ```
-
-- 请求方法
-
-  可以使用 `method[*]` 的方式显式指定请求方法。
-
-  例如：
-
-  ```go
-  type User struct {
-  	webapi.Controller
-  	methodPUT struct{}
-  }
-  ```
-
-  方法注册结果为：
-
-  ```bash
-  [PUT]	/api/usr/SayHi
-  ```
-
-  也可以同时写入多个：
-
-  ```go
-  type User struct {
-  	webapi.Controller
-  	methodPUT struct{}
-  	methodGET struct{}
-  }
-  ```
-
-  那么注册结果为：
-
-  ```bash
-  [GET]	/api/usr/SayHi
-  [PUT]	/api/usr/SayHi
-  ```
-
-  > 注意：
-  >
-  > 显式指定请求方法将会是强制的，回避所有约束的。
-
-- 参数来源指定
-
-  可以使用：
-
-  - fromBody 指定此参数来自正文（*Body*）
-  - fromQuery 要求此参数来自查询（*Query*）
-
-  其中，`fromBody` 会导致在没有显示请求方法说明的条件下改变默认的注册行为为 `POST`。
-
-  > 注意：
-  >
-  > 当参数数量为 2 的时候，第一个参数始终来自于正文。参数来源指定将会无效。
-
-### 前置件（*Predecessor*）
-
-以前的中间件现在变为前置件，通过约定来提高前置件的灵活度并且提高其安全性和复用性。以前需要以一个符合函数签名的函数注册，现在只需要提供符合约定的实例即可。
-
-实例需要提供：
+可以看到参数自动放到了 `query` 中。亦可支持正文自动序列化，例如声明方法：
 
 ```go
-Invoke(*webapi.Context, webapi.HTTPHandler)
+func (article *article) Save(entity *struct {
+	ID         uint
+	Title      string
+	Content    string
+	CreateTime time.Time
+}, query struct {
+	CreateTime string `json:"time"`
+}) {
+	entity.CreateTime, _ = time.Parse("2006-01-02", query.CreateTime)
+	entity.ID = article.id
+	article.Reply(http.StatusAccepted, entity)
+}
 ```
 
-方法以供运行时注册。
+这个方法将会注册为 `[POST]  /article/{digits}/save`，因为存在 `*struct{}` 结构，所以默认为 POST，但是可以通过 `method[HTTPMETHOD] struct` 的私有字段的形式去显式声明 HTTP 方法。同样使用 `curl`：
+
+```go
+~ curl -X "POST" "http://localhost:9527/article/123/save?time=2019-01-01" \
+     -H 'Content-Type: application/json; charset=utf-8' \
+     -d $'{
+  "Title": "Hello WebAPI for Golang",
+  "Content": "Awesome!"
+}'
+
+#[{"ID":123,"Title":"Hello WebAPI for Golang","Content":"Awesome!","CreateTime":"2019-01-01T00:00:00Z"}]
+```
+
+可以看到查询中的事件成功被访问并赋到了正文。也请留意到，不管是之前使用的 `string` 作为返回值，还是这个节点的，手动使用 `.Reply(STATUSCODE, INTERFACE{})` 都可以自动处理并回复给客户端。
+
+> 序列化器可以手动指定。在上下文 (Context) 的 Serializer 属性中指定。
+
+同时，查询和正文的结构支持检查，为他们添加 `Check() error` 方法即可在进入业务代码之前检查数据的合法性，将防范性编码与业务隔离开来。
+
+### 路由前置条件（前参数化访问）支持
+
+**收束控制器处理数据范畴设立 API 访问准入门槛。提供其他路由服务无法提供的匹配-回落和具体业务控制器前置条件能力，从根本隔离开非法访问，降低出错几率，提高业务编码效率并提高系统鲁棒性。**
+
+刚才的请求中我们看到，访问地址 `/article/123/save` 中的 `123` 被捕获并且最后在回复正文的 `ID` 中出现。WebAPI 允许为控制器设立前置条件（Precondition），声明的方法：
+
+```go
+func (article *article) Init(id uint) (err error) {
+	article.id = id
+	return
+}
+```
+
+只需要为控制器声明返回值为 `error` 且名称为 `Init` 的方法即可自动在进入实际方法前调用它。节点注册形式也发生了些许变更。如果参数为
+
+- 整型、长整型、无符号整型、无符号长整型（Int/UInt）那么将会得到一个 `/{digits}` 的注册点
+- 单精度浮点、双精度浮点（Float32/64）那么将会得到一个 `/{float}` 的注册点
+- 字符串（String）将会得到一个 `/{string}` 的注册点
+
+所以上面的 `Init(uint) error` 函数将会产生 `/{digits}` 的注册点。
+
+如果调用函数返回的错误值不为空，那么将会通知客户端 Bad Request。这从侧面区分了对象方法（Object Method）和静态方法（Static Method），编码时可以更关注业务本身而不用去操心各种前置条件审查，或节省大量近似的代码。
+
+### 端点条件（后参数化访问）支持
+
+**不需要反向代理配置伪静态即可提供原生支持参数化访问，提供更直观简洁的 API。**
+
+既然前参数化访问都支持，那么自然后参数化访问也可以。刚才我们遇到，访问文章正文需要使用查询参数，虽然可以正常工作，但是未免显得太过单调。通过前置参数支持需要使用 `Read` 一类的方法，感觉不自然。我们可以通过后置参数的形式来提供形如 `/article/{guid}` 的访问形式：
+
+```go
+func (article *Article) Index(guid string) string {
+	return fmt.Sprintf("you are reading post-%s", guid)
+}
+```
+
+使用 `curl` 测试一下：
+
+```go
+~ curl http://localhost:9527/article/id-233666
+#you are reading post-id-233666
+```
+
+> ⚠️ 注意
+>
+> 此方法也可以通过 `func (article *article) Index() *string*` 的方法实现。在本例中两个方法允许共存，因为前者为 `/article/{string}` 后者为 `/article/{digits}`。在协作的时候务必注意此类问题。如果出现重复注册节点，控制器将会注册失败并提示错误。
+
+### 中途加密策略支持
+
+**完全可托付的原生加密解密，兼容密钥协商机制，即使密钥变更或不唯一，只需一次设定，流水线明文密文处理更加可靠，完全杜绝因为疏忽或者意外造成的机密元数据泄露的可能，数据安全高枕无忧。**
+
+加解密服务依托于上下文，可以在中间件中指定上下文中的 `CryptoService` 来实现提供统一的加解密服务，将无关业务的加解密方法独立出去，提高开发者效率。
+
+方法亦可在使用中途更改，即此加密解密的模块是动态可替换的。
+
+## 性能
+
+在 8 vCPU / 16G RAM 的测试环境 TLinux 虚拟机（非空闲）上使用 Cyborg 性能实用程序从 100 客户端，200 请求发起压力到 580 客户端，1160 请求的 Hello World 接口性能记录：
+
+| 客户端数 | 总请求 | 总响应时长 | 秒级处理量 |
+| -------- | ------ | ---------- | ---------- |
+| 100      | 200    | 0.011942s  | 8374.09354 |
+| 120      | 240    | 0.010043s  | 11949.1254 |
+| 140      | 280    | 0.008378s  | 16710.2346 |
+| 160      | 320    | 0.012892s  | 12410.937  |
+| 180      | 360    | 0.011250s  | 15999.7355 |
+| 200      | 400    | 0.011609s  | 17228.3244 |
+| 220      | 440    | 0.017484s  | 12582.8826 |
+| 240      | 480    | 0.020186s  | 11889.3559 |
+| 260      | 520    | 1.004284s  | 258.890958 |
+| 280      | 560    | 0.015453s  | 18119.6865 |
+| 300      | 600    | 0.016319s  | 18383.022  |
+| 320      | 640    | 1.011559s  | 316.343278 |
+| 340      | 680    | 1.014014s  | 335.301017 |
+| 360      | 720    | 0.016673s  | 21591.3134 |
+| 380      | 760    | 0.020759s  | 18305.5029 |
+| 400      | 800    | 1.007692s  | 396.946831 |
+| 420      | 840    | 0.024735s  | 16980.1533 |
+| 440      | 880    | 0.023144s  | 19011.1727 |
+| 460      | 920    | 0.025437s  | 18083.5409 |
+| 480      | 960    | 1.006551s  | 476.875941 |
+| 500      | 1000   | 1.008704s  | 495.685546 |
+| 520      | 1040   | 1.010670s  | 514.510124 |
+| 540      | 1080   | 1.009176s  | 535.089889 |
+| 560      | 1120   | 0.034008s  | 16466.9452 |
+| 580      | 1160   | 0.031361s  | 18494.0912 |
+
+由于目标机器以及压力发起机器均为虚拟机的缘故，呈现出数据抖动，根据实际经验上，物理服务器上此抖动不存在。整体性能中位数 12582.88259（1.2w），摒弃低于 1000 的记录性能中位数 16980.15331（1.7w）。对于单节点而言性能相对乐观。
 
 ---
 
-最后，欢迎使用 WebAPI 和 CandyFramework，我们彼此酷码似飞。
+最后，欢迎使用 WebAPI，我们彼此酷码似飞。
 
-Finally, Welcome use WebAPI & CandyFramework. Cool to Code.
+Finally, Welcome use WebAPI. Cool to Code.
