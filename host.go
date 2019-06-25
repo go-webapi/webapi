@@ -3,7 +3,6 @@ package webapi
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
@@ -210,6 +209,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			path += ("/" + method.Name)
 		}
 		for argindex := 1; argindex < inputArgsCount; argindex++ {
+			// var methodflag = true
 			arg := method.Type.In(argindex)
 			isBody := arg.Kind() == reflect.Ptr
 			if isBody || arg.Kind() == reflect.Struct {
@@ -217,8 +217,8 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				for temp.Kind() == reflect.Ptr {
 					temp = temp.Elem()
 				}
-				temp.FieldByNameFunc(func(name string) bool {
-					if len(name) > len(reservedNamedStructure.Method)+2 {
+				if _, errorOccurred := temp.FieldByNameFunc(func(name string) bool {
+					if strings.Index(name, reservedNamedStructure.Method) == 0 {
 						switch httpmethod := strings.ToUpper(strings.Replace(name, reservedNamedStructure.Method, "", 1)); httpmethod {
 						case http.MethodConnect, http.MethodDelete, http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodPatch, http.MethodPost, http.MethodPut, http.MethodTrace:
 							methods[httpmethod] = true
@@ -229,7 +229,9 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 						}
 					}
 					return false
-				})
+				}); errorOccurred {
+					return err
+				}
 			}
 			if isBody {
 				if hasBody {
@@ -347,7 +349,7 @@ func (host *Host) runEndpoint(method *function, ctx *Context, arguments ...strin
 			}
 			index++
 		} else if arg.isBody {
-			body, _ := ioutil.ReadAll(ctx.r.Body)
+			body := ctx.Body()
 			if len(body) > 0 {
 				if ctx.Crypto != nil {
 					body, _ = ctx.Crypto.Decrypt(body)

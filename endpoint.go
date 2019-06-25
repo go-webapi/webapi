@@ -29,7 +29,7 @@ func (point *endpoint) Add(path string, handler httpHandler) error {
 			current = current.endpoints[address]
 		}
 		if current.handler != nil {
-			return errors.New("endpoint already existed")
+			return errors.New("endpoint already exists: " + path)
 		}
 		current.handler = handler
 	}
@@ -52,7 +52,7 @@ func (point *endpoint) Find(path string) (httpHandler, []string) {
 	}
 	for _, path := range paths {
 		if len(current.endpoints) == 0 {
-			break
+			return nil, args
 		}
 		obj, existed := current.endpoints[path]
 		if !existed {

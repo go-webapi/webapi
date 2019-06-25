@@ -2,6 +2,7 @@ package webapi
 
 import (
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -22,6 +23,7 @@ type (
 		statuscode   int
 		w            http.ResponseWriter
 		r            *http.Request
+		body         []byte
 		predecessors []Middleware
 
 		Crypto         CryptoService
@@ -98,6 +100,17 @@ func (ctx *Context) Context() *Context {
 //GetRequest 获取请求信息
 func (ctx *Context) GetRequest() *http.Request {
 	return ctx.r
+}
+
+//Body 获取上下文正文数据
+func (ctx *Context) Body() []byte {
+	if ctx.r.Body != nil && ctx.body == nil {
+		ctx.body, _ = ioutil.ReadAll(ctx.r.Body)
+		if ctx.body == nil {
+			ctx.body = []byte{}
+		}
+	}
+	return ctx.body
 }
 
 //StatusCode 获取状态码
