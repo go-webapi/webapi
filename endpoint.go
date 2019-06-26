@@ -13,14 +13,14 @@ type (
 	}
 )
 
-//Add 添加 HTTP 端点
+//Add Add HTTP endpoint
 func (point *endpoint) Add(path string, handler httpHandler) error {
 	if point.endpoints == nil {
 		point.endpoints = map[string]*endpoint{}
 	}
 	var current = point
 	if !strings.Contains(path, "{string}") && !strings.Contains(path, "{digits}") && !strings.Contains(path, "{float}") {
-		current.endpoints[path] = &endpoint{handler: handler} //便捷注册法
+		current.endpoints[path] = &endpoint{handler: handler} //Rapid
 	} else {
 		for _, address := range strings.Split(path, "/")[1:] {
 			if _, existed := current.endpoints[address]; !existed {
@@ -36,7 +36,7 @@ func (point *endpoint) Add(path string, handler httpHandler) error {
 	return nil
 }
 
-//Find 查找 HTTP 端点
+//Find Find HTTP endpoint
 func (point *endpoint) Find(path string) (httpHandler, []string) {
 	if point.endpoints == nil {
 		point.endpoints = map[string]*endpoint{}
@@ -44,6 +44,7 @@ func (point *endpoint) Find(path string) (httpHandler, []string) {
 	if handler, existed := point.endpoints[path]; existed {
 		return handler.handler, nil
 	}
+	//fallback
 	var current = point
 	args := []string{}
 	var paths = strings.Split(path, "/")[1:]

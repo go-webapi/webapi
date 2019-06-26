@@ -7,15 +7,17 @@
  
 ```
 
-WebAPI 是一个适用于 Golang 的 Web API 服务开发的基础库。使用 WebAPI 可以有效降低编码出错的概率并回避无聊的重复代码。WebAPI for Golang 灵感来源于 Microsoft ASP.NET Core，所以如果对于 .NET 或者 JavaEE 熟悉的开发者而言，定会游刃有余。
+[中文](https://github.com/johnwiichang/webapi/blob/master/readme.zh-cn.md) | [English](https://github.com/johnwiichang/webapi/blob/master/readme.md)
 
-## 能力
+WebAPI is a basic library for Web API service development for Golang. Using WebAPI can effectively reduce the probability of coding errors and avoid boring duplicate code. WebAPI for Golang is inspired by Microsoft ASP.NET Core, so if you are familiar with .NET or JavaEE developers, you will be well equipped.
 
-### 自动路由注册与复合控制器
+## What & How
 
-**聚焦业务核心回避无关的规则，DDD 与 MVVM 等设计模式高度相容。不同业务模块拥有自身控制器（组），支持模块细分与多模块统一整合的设计（允许多人协同）。基于约定的自动路由注册降低冗余代码，提高设计效率同时回避公开地址与内部实现失去同步的可能。**
+### Auto-Registration & Composite Controller
 
-声明控制器：
+**Focusing on business core avoidance of irrelevant rules, DDD is highly compatible with design patterns such as MVVM. Different business modules have their own controllers (groups), which support the design of module subdivision and multi-module unified integration (allowing multi-person collaboration). Conventional automatic route registration reduces redundant code, improves design efficiency while avoiding the possibility of loss of synchronization between the public address and the internal implementation.**
+
+Declare the controller:
 
 ```go
 type Article struct {
@@ -23,7 +25,7 @@ type Article struct {
 }
 ```
 
-声明接入点：
+Declare the endpoint:
 
 ```go
 func (article *Article) Show(query struct {
@@ -33,9 +35,9 @@ func (article *Article) Show(query struct {
 }
 ```
 
-> WebAPI 遵循 Golang 原则，但凡可访问的方法（大写字母开头的函数）均会被注册为 API 接入点。
+> WebAPI follows the Golang principle, any accessible method (a function that begins with an uppercase letter) is registered as an API endpoint.
 
-接入点会被注册为 `/article/show?guid=[guid]`，如果有多个控制器处理不同业务，那么可以通过 `RouteAlias() string` 方法来指定控制器别名：
+The endpoint will be registered as `/article/show?guid=[guid]`. If there are multiple controllers handling different services, the controller alias can be specified by the `RouteAlias() string` method:
 
 ```go
 type article struct {
@@ -48,22 +50,22 @@ func (article *article) RouteAlias() string {
 }
 ```
 
-然后不管在 `article` 还是 `Article` 下的方法均会注册到 `/article` 下。不过需要注意的是，此类注册器需要回避重名问题。不过在运行时 WebAPI 会针对重名方法做出致命警告 (panic)。
+Then both methods from `article` and `Article` will be registered under `/article`. However, it should be noted that such registrars need to avoid duplicate names. However, at runtime the WebAPI wo**n't** make a fatal warning(panic) for the duplicate name method.
 
-> 使用时，不妨将各个业务模块细分给不同的人去完成。最后通过 `RouteAlias` 可以轻松将他们整合在一起。
+> When you use it, you can divide each business module into different people to complete. Finally, they can be easily integrated through `RouteAlias`.
 
-### 查询/正文自动序列化与反序列化支持
+### Query/Body Auto-Serialization Support
 
-**完全消除在业务逻辑中的正文读取、序列化/反序列化、查询检索与转化，借助于中间件，甚至还可以配置 MsgPack 等非系统内建/私有化序列器。**
+**Complete elimination of text reading, serialization/deserialization, query retrieval and transformation in business logic, and even middleware, you can even configure non-system built-in/private sequencers such as MsgPack.**
 
-我们使用  `curl` 访问一下刚才的 API：
+Try to use `curl` to access the API just now:
 
 ```bash
 ~ curl http://localhost:9527/article/show\?guid\=79526
 #you are reading post-79526
 ```
 
-可以看到参数自动放到了 `query` 中。亦可支持正文自动序列化，例如声明方法：
+You can see that the parameters are automatically placed in `query`. It also supports automatic text serialization, such as declaration methods:
 
 ```go
 func (article *article) Save(entity *struct {
@@ -80,7 +82,7 @@ func (article *article) Save(entity *struct {
 }
 ```
 
-这个方法将会注册为 `[POST]  /article/{digits}/save`，因为存在 `*struct{}` 结构，所以默认为 POST，但是可以通过 `method[HTTPMETHOD] struct` 的私有字段的形式去显式声明 HTTP 方法。同样使用 `curl`：
+This method will be registered as `[POST] /article/{digits}/save`, because there is a `*struct{}` structure, so the default method is POST. However, the HTTP methods can be explicitly declared in the form of a private field of `method[HTTPMETHOD] struct`. Also use `curl`:
 
 ```go
 ~ curl -X "POST" "http://localhost:9527/article/123/save?time=2019-01-01" \
@@ -93,17 +95,17 @@ func (article *article) Save(entity *struct {
 #[{"ID":123,"Title":"Hello WebAPI for Golang","Content":"Awesome!","CreateTime":"2019-01-01T00:00:00Z"}]
 ```
 
-可以看到查询中的事件成功被访问并赋到了正文。也请留意到，不管是之前使用的 `string` 作为返回值，还是这个节点的，手动使用 `.Reply(STATUSCODE, INTERFACE{})` 都可以自动处理并回复给客户端。
+You can see that the time in the query was successfully accessed and assigned to the body. Please also note that the previously used `string` as the return value, but this node manually reply to the client using `.Reply(STATUSCODE, INTERFACE{})` to automatically process object.
 
-> 序列化器可以手动指定。在上下文 (Context) 的 Serializer 属性中指定。
+> The serializer can be specified manually with Serializer property in the Context.
 
-同时，查询和正文的结构支持检查，为他们添加 `Check() error` 方法即可在进入业务代码之前检查数据的合法性，将防范性编码与业务隔离开来。
+At the same time, the query and body structure support check, add the `Check() error` method to them to check the legality of the data before entering the business code, and isolate the defense code from the business.
 
-### 路由前置条件（前参数化访问）支持
+### Routing Precondition (Pre-Parameterized Access) Support
 
-**收束控制器处理数据范畴设立 API 访问准入门槛。提供其他路由服务无法提供的匹配-回落和具体业务控制器前置条件能力，从根本隔离开非法访问，降低出错几率，提高业务编码效率并提高系统鲁棒性。**
+**The convergence controller handles the data category and sets up API access barriers. Provides matching-fallback and specific service controller pre-conditions that other routing services cannot provide, which isolates illegal access, reduces the probability of errors, improves service coding efficiency, and improves system robustness.**
 
-刚才的请求中我们看到，访问地址 `/article/123/save` 中的 `123` 被捕获并且最后在回复正文的 `ID` 中出现。WebAPI 允许为控制器设立前置条件（Precondition），声明的方法：
+As you saw in the previous request, `123` in the access address `/article/123/save` was caught and finally appeared in the `ID` of the reply body. WebAPI allows preconditions (Precondition) to be set for the controller, the declared method:
 
 ```go
 func (article *article) Init(id uint) (err error) {
@@ -112,21 +114,21 @@ func (article *article) Init(id uint) (err error) {
 }
 ```
 
-只需要为控制器声明返回值为 `error` 且名称为 `Init` 的方法即可自动在进入实际方法前调用它。节点注册形式也发生了些许变更。如果参数为
+You only need to declare a method with a return value of `error` and the name `Init` for the controller to automatically call it before entering the actual method. There have also been some changes to the node registration form. If the parameter is
 
-- 整型、长整型、无符号整型、无符号长整型（Int/UInt）那么将会得到一个 `/{digits}` 的注册点
-- 单精度浮点、双精度浮点（Float32/64）那么将会得到一个 `/{float}` 的注册点
-- 字符串（String）将会得到一个 `/{string}` 的注册点
+- Integer, long integer, unsigned integer, unsigned long integer (Int/UInt) will get a registration point for `/{digits}`
+- Single precision floating point, double precision floating point (Float32/64) then will get a registration point of `/{float}`
+- String will get a registration point for `/{string}`
 
-所以上面的 `Init(uint) error` 函数将会产生 `/{digits}` 的注册点。
+So the above `Init(uint) error` function will generate a registration point for `/{digits}`.
 
-如果调用函数返回的错误值不为空，那么将会通知客户端 Bad Request。这从侧面区分了对象方法（Object Method）和静态方法（Static Method），编码时可以更关注业务本身而不用去操心各种前置条件审查，或节省大量近似的代码。
+If the error value returned by the calling function is not empty, the client Bad Request will be notified. This distinguishes between the Object Method and the Static Method from the side. When coding, you can pay more attention to the business itself without worrying about various preconditions, or saving a lot of approximate code.
 
-### 端点条件（后参数化访问）支持
+### Endpoint Condition (Post-Parameterized Access) Support
 
-**不需要反向代理配置伪静态即可提供原生支持参数化访问，提供更直观简洁的 API。**
+**No reverse proxy required to configure pseudo-static to provide native support for parameterized access, providing a more intuitive and concise API.**
 
-既然前参数化访问都支持，那么自然后参数化访问也可以。刚才我们遇到，访问文章正文需要使用查询参数，虽然可以正常工作，但是未免显得太过单调。通过前置参数支持需要使用 `Read` 一类的方法，感觉不自然。我们可以通过后置参数的形式来提供形如 `/article/{guid}` 的访问形式：
+Since the pre-parameterized access is supported, then natural parameterized access is also possible. Just now we encountered that access to the body of the article requires the use of query parameters, although it can work normally, but it seems too monotonous. Supporting the use of pre-parameters requires a method like `Read`, which feels unnatural. We can provide access forms like `/article/{guid}` in the form of post-parameters:
 
 ```go
 func (article *Article) Index(guid string) string {
@@ -134,30 +136,30 @@ func (article *Article) Index(guid string) string {
 }
 ```
 
-使用 `curl` 测试一下：
+Test with `curl`:
 
 ```go
 ~ curl http://localhost:9527/article/id-233666
 #you are reading post-id-233666
 ```
 
-> ⚠️ 注意
+> ⚠️ Attention
 >
-> 此方法也可以通过 `func (article *article) Index() *string*` 的方法实现。在本例中两个方法允许共存，因为前者为 `/article/{string}` 后者为 `/article/{digits}`。在协作的时候务必注意此类问题。如果出现重复注册节点，控制器将会注册失败并提示错误。
+> This method can also be implemented by the method of `func (article *article) Index() *string*`. In this case, the two methods allow coexistence because the former is `/article/{string}` and the latter is `/article/{digits}`. Be aware of such issues when collaborating. If a duplicate registration node occurs, the controller will fail to register and prompt an error.
 
-### 中途加密策略支持
+### Midway Encryption Policy Support
 
-**完全可托付的原生加密解密，兼容密钥协商机制，即使密钥变更或不唯一，只需一次设定，流水线明文密文处理更加可靠，完全杜绝因为疏忽或者意外造成的机密元数据泄露的可能，数据安全高枕无忧。**
+**Fully entrusted native encryption and decryption, compatible with key negotiation mechanism, even if the key is changed or not unique, only one setting, the pipeline plaintext ciphertext processing is more reliable, completely eliminate the possibility of confidential metadata leakage caused by negligence or accident Data security is safe and worry-free.**
 
-加解密服务依托于上下文，可以在中间件中指定上下文中的 `CryptoService` 来实现提供统一的加解密服务，将无关业务的加解密方法独立出去，提高开发者效率。
+The encryption and decryption service relies on the context, and can specify the `CryptoService` in the context in the middleware to provide a unified encryption and decryption service, and to separate the encryption and decryption methods of the unrelated business, thereby improving the developer efficiency.
 
-方法亦可在使用中途更改，即此加密解密的模块是动态可替换的。
+The method can also be changed in the middle of use, that is, the module for encryption and decryption is dynamically replaceable.
 
-## 性能
+## Performance
 
-在 8 vCPU / 16G RAM 的测试环境 TLinux 虚拟机（非空闲）上使用 Cyborg 性能实用程序从 100 客户端，200 请求发起压力到 580 客户端，1160 请求的 Hello World 接口性能记录：
+In a test environment of 8 vCPU / 16G RAM TLinux virtual machine (not idle) via the Cyborg performance utility from 100 clients, 200 requests to initiate pressure to 580 client, 1160 requested Hello World interface performance record:
 
-| 客户端数 | 总请求 | 总响应时长 | 秒级处理量 |
+| Clients | Requests | Total | QPS |
 | -------- | ------ | ---------- | ---------- |
 | 100      | 200    | 0.011942s  | 8374.09354 |
 | 120      | 240    | 0.010043s  | 11949.1254 |
@@ -185,10 +187,8 @@ func (article *Article) Index(guid string) string {
 | 560      | 1120   | 0.034008s  | 16466.9452 |
 | 580      | 1160   | 0.031361s  | 18494.0912 |
 
-由于目标机器以及压力发起机器均为虚拟机的缘故，呈现出数据抖动，根据实际经验上，物理服务器上此抖动不存在。整体性能中位数 12582.88259（1.2w），摒弃低于 1000 的记录性能中位数 16980.15331（1.7w）。对于单节点而言性能相对乐观。
+Since the target machine and the pressure-initiating machine are both virtual machines, data jitter is presented. According to actual experience, this jitter does not exist on the physical server. The median overall performance was 12582.88259 (1.2w), and the median recording performance below 1000 was discarded. 16980.15331 (1.7w). Performance is relatively optimistic for a single node.
 
 ---
-
-最后，欢迎使用 WebAPI，我们彼此酷码似飞。
 
 Finally, Welcome use WebAPI. Cool to Code.

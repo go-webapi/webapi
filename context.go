@@ -8,17 +8,17 @@ import (
 )
 
 type (
-	//Middleware 前置件
+	//Middleware Middleware
 	Middleware interface {
 		Invoke(ctx *Context, next HTTPHandler)
 	}
 
-	//HTTPHandler 控制器执行
+	//HTTPHandler Public HTTP Handler
 	HTTPHandler func(*Context)
 
 	httpHandler func(*Context, ...string)
 
-	//Context 请求上下文
+	//Context HTTP Request Context
 	Context struct {
 		statuscode   int
 		w            http.ResponseWriter
@@ -32,15 +32,17 @@ type (
 	}
 )
 
-//Reply 回复
+//Reply Reply to client with any data which can be marshaled into bytes if not bytes or string
 func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	var data []byte
 	if len(obj) > 0 {
 		switch obj[0].(type) {
 		case string:
+			//trans to bytes with utf8 encoding
 			data = []byte(obj[0].(string))
 			break
 		case []byte:
+			//direct
 			data = obj[0].([]byte)
 			break
 		case error:
@@ -59,7 +61,7 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	return ctx.Write(httpstatus, data)
 }
 
-//Write 写入（只允许执行一次写入操作）
+//Write Write to response(only for once)
 func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	if ctx.statuscode == 0 {
 		ctx.statuscode = httpstatus
@@ -71,38 +73,38 @@ func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	return
 }
 
-//Redirect 跳转
-func (ctx *Context) Redirect(httpstatus int, addr string) {
-	if !(httpstatus > 299 && httpstatus < 400) {
-		httpstatus = http.StatusPermanentRedirect
+//Redirect Jump to antoher url
+func (ctx *Context) Redirect(addr string, httpstatus ...int) {
+	if len(httpstatus) == 0 || !(httpstatus[0] > 299 && httpstatus[0] < 400) {
+		httpstatus = []int{http.StatusTemporaryRedirect}
 	}
-	ctx.statuscode = httpstatus
-	http.Redirect(ctx.w, ctx.r, addr, httpstatus)
+	ctx.statuscode = httpstatus[0]
+	http.Redirect(ctx.w, ctx.r, addr, httpstatus[0])
 }
 
-//SetCookies 设置小甜饼
+//SetCookies Set cookies
 func (ctx *Context) SetCookies(cookies ...*http.Cookie) {
 	for _, cookie := range cookies {
 		http.SetCookie(ctx.w, cookie)
 	}
 }
 
-//ResponseHeader 应答头
+//ResponseHeader Response Header
 func (ctx *Context) ResponseHeader() http.Header {
 	return ctx.w.Header()
 }
 
-//Context 获取上下文信息
+//Context Get Context
 func (ctx *Context) Context() *Context {
 	return ctx
 }
 
-//GetRequest 获取请求信息
+//GetRequest Get Request from Context
 func (ctx *Context) GetRequest() *http.Request {
 	return ctx.r
 }
 
-//Body 获取上下文正文数据
+//Body The Body Bytes from Context
 func (ctx *Context) Body() []byte {
 	if ctx.r.Body != nil && ctx.body == nil {
 		ctx.body, _ = ioutil.ReadAll(ctx.r.Body)
@@ -113,7 +115,7 @@ func (ctx *Context) Body() []byte {
 	return ctx.body
 }
 
-//StatusCode 获取状态码
+//StatusCode Context Status Code
 func (ctx *Context) StatusCode() int {
 	return ctx.statuscode
 }

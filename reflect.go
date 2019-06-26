@@ -10,10 +10,10 @@ import (
 
 type (
 	function struct {
-		Args        []*param       //参数
-		ContextArgs []reflect.Type //构造参数
-		Context     reflect.Type   //上下文
-		Function    reflect.Value  //实现函数
+		Args        []*param       //Parameters
+		ContextArgs []reflect.Type //Construct Parameters for Context
+		Context     reflect.Type   //Context
+		Function    reflect.Value  //Actual Function
 	}
 
 	param struct {
@@ -23,7 +23,7 @@ type (
 	}
 )
 
-//Load 从数据源载入对象
+//Load Load object from data source
 func (p *param) Load(obj interface{}, serializer ...Serializer) (*reflect.Value, error) {
 	if b, isBytes := obj.([]byte); isBytes {
 		return p.loadFromBytes(b, serializer...)
@@ -33,7 +33,7 @@ func (p *param) Load(obj interface{}, serializer ...Serializer) (*reflect.Value,
 	return nil, errors.New("cannot accept input type " + reflect.TypeOf(obj).Name())
 }
 
-//loadFromBytes 从字节数组中载入值
+//loadFromBytes Load object from bytes
 func (p *param) loadFromBytes(body []byte, serializer ...Serializer) (*reflect.Value, error) {
 	if len(serializer) == 0 {
 		serializer = []Serializer{JSONSerializer}
@@ -54,7 +54,7 @@ func (p *param) loadFromBytes(body []byte, serializer ...Serializer) (*reflect.V
 	return &obj, nil
 }
 
-//loadFromValues 从值对中载入值
+//loadFromValues Load object from url.Values
 func (p *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
 	obj, callback := createObj(p.Type)
 	objType := obj.Type()
@@ -84,7 +84,7 @@ func (p *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
 	return &obj, nil
 }
 
-//createObj 创建可写对象，并返回一个转化它为设定值的函数
+//createObj Create writable object and return a function which can set back to actual type
 func createObj(typ reflect.Type) (reflect.Value, func(reflect.Value) reflect.Value) {
 	level := 0
 	for typ.Kind() == reflect.Ptr {
@@ -100,7 +100,7 @@ func createObj(typ reflect.Type) (reflect.Value, func(reflect.Value) reflect.Val
 	}
 }
 
-//setValue 为 reflect.Value 设置值
+//setValue Set value to reflect.Value
 func setValue(value reflect.Value, data string) (err error) {
 	switch value.Type().Kind() {
 	case reflect.String:
@@ -133,7 +133,7 @@ func setValue(value reflect.Value, data string) (err error) {
 	return nil
 }
 
-//setArray 为 reflect.Value 设置数组
+//setArray Set array value to reflect.Value
 func setArray(value reflect.Value, data []string) (err error) {
 	cap := value.Len()
 	if cap > len(data) {

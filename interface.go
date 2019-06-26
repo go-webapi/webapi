@@ -6,9 +6,9 @@ import (
 )
 
 type (
-	//Controller 控制器声明
+	//Controller Controller statement
 	Controller interface {
-		Redirect(int, string)
+		Redirect(string, ...int)
 		SetCookies(...*http.Cookie)
 		Reply(int, ...interface{}) error
 		Write(int, []byte) error
@@ -16,7 +16,7 @@ type (
 		Context() *Context
 	}
 
-	//aliasController 别名控制器
+	//aliasController Alias Controller statement
 	aliasController interface {
 		Controller
 		RouteAlias() string
@@ -24,36 +24,37 @@ type (
 )
 
 type (
-	//CryptoService 密码学服务
+	//CryptoService Cryptography service
 	CryptoService interface {
 		Encrypt([]byte) []byte
 		Decrypt([]byte) ([]byte, error)
 	}
 
-	//Validator 验证器
+	//Validator Validator for body and query structures
 	Validator interface {
 		Check() error
 	}
 
-	//Serializer 序列器
+	//Serializer Serializer
 	Serializer interface {
 		Marshal(interface{}) ([]byte, error)
 		Unmarshal([]byte, interface{}) error
 	}
 
-	//LogService 日志服务
+	//LogService Log service
 	LogService interface {
-		//Log 带有 [datetime] 前缀的日志
+		//Log with [datetime] prefix
 		Log(tpl string, args ...interface{})
 
-		//Write 仅文字
+		//Write only text
 		Write(tpl string, args ...interface{})
 
+		//Stop exit
 		Stop()
 	}
 )
 
-//JSONSerializer JSON 序列器
+//JSONSerializer JSON Serializer
 var JSONSerializer Serializer = &jsonSerializer{}
 
 type jsonSerializer struct{}
