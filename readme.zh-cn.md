@@ -7,6 +7,8 @@
  
 ```
 
+ [English](https://github.com/johnwiichang/webapi/blob/master/readme.md) | [中文](https://github.com/johnwiichang/webapi/blob/master/readme.zh-cn.md)
+
 WebAPI 是一个适用于 Golang 的 Web API 服务开发的基础库。使用 WebAPI 可以有效降低编码出错的概率并回避无聊的重复代码。WebAPI for Golang 灵感来源于 Microsoft ASP.NET Core，所以如果对于 .NET 或者 JavaEE 熟悉的开发者而言，定会游刃有余。
 
 ## 能力
