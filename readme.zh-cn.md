@@ -7,7 +7,7 @@
  
 ```
 
- [English](https://github.com/johnwiichang/webapi/blob/master/readme.md) | [中文](https://github.com/johnwiichang/webapi/blob/master/readme.zh-cn.md)
+ [English](https://github.com/johnwiichang/webapi/blob/master/readme.md) | 中文
 
 WebAPI 是一个适用于 Golang 的 Web API 服务开发的基础库。使用 WebAPI 可以有效降低编码出错的概率并回避无聊的重复代码。WebAPI for Golang 灵感来源于 Microsoft ASP.NET Core，所以如果对于 .NET 或者 JavaEE 熟悉的开发者而言，定会游刃有余。
 
@@ -145,7 +145,7 @@ func (article *Article) Index(guid string) string {
 
 > ⚠️ 注意
 >
-> 此方法也可以通过 `func (article *article) Index() *string*` 的方法实现。在本例中两个方法允许共存，因为前者为 `/article/{string}` 后者为 `/article/{digits}`。在协作的时候务必注意此类问题。如果出现重复注册节点，控制器将会注册失败并提示错误。
+> 此方法也可以通过 `func (article *article) Index(id int)` 的方法实现。在本例中两个方法允许共存，因为前者为 `/article/{string}` 后者为 `/article/{digits}`。在协作的时候务必注意此类问题。如果出现重复注册节点，控制器将会注册失败并提示错误。
 
 ### 中途加密策略支持
 

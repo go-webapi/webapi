@@ -7,7 +7,7 @@
  
 ```
 
-[中文](https://github.com/johnwiichang/webapi/blob/master/readme.zh-cn.md) | [English](https://github.com/johnwiichang/webapi/blob/master/readme.md)
+[中文](https://github.com/johnwiichang/webapi/blob/master/readme.zh-cn.md) | English
 
 WebAPI is a basic library for Web API service development for Golang. Using WebAPI can effectively reduce the probability of coding errors and avoid boring duplicate code. WebAPI for Golang is inspired by Microsoft ASP.NET Core, so if you are familiar with .NET or JavaEE developers, you will be well equipped.
 
@@ -145,7 +145,7 @@ Test with `curl`:
 
 > ⚠️ Attention
 >
-> This method can also be implemented by the method of `func (article *article) Index() *string*`. In this case, the two methods allow coexistence because the former is `/article/{string}` and the latter is `/article/{digits}`. Be aware of such issues when collaborating. If a duplicate registration node occurs, the controller will fail to register and prompt an error.
+> This method can also be implemented by the method of `func (article *article) Index(id int)`. In this case, the two methods allow coexistence because the former is `/article/{string}` and the latter is `/article/{digits}`. Be aware of such issues when collaborating. If a duplicate registration node occurs, the controller will fail to register and prompt an error.
 
 ### Midway Encryption Policy Support
 
