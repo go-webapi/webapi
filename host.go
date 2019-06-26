@@ -53,6 +53,7 @@ type (
 	Host struct {
 		handlers map[string]*endpoint
 		conf     Config
+		errList  []error
 
 		//堆栈数据
 		basepath     string
@@ -154,6 +155,11 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 	{
 		host.initCheck()
 		basePath = host.basepath + solveBasePath(basePath)
+		defer func() {
+			if err != nil {
+				host.errList = append(host.errList, err)
+			}
+		}()
 	}
 	val := reflect.ValueOf(controller)
 	typ := val.Type()
@@ -205,8 +211,9 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			Context:     method.Type.In(0),
 			Args:        make([]*param, 0),
 		}
-		if method.Name != "Index" {
-			path += ("/" + method.Name)
+		paths := []string{path + "/" + method.Name}
+		if method.Name == "Index" {
+			paths = append(paths, path)
 		}
 		for argindex := 1; argindex < inputArgsCount; argindex++ {
 			// var methodflag = true
@@ -259,11 +266,15 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				ep.Args = append(ep.Args, &param{
 					Type: arg,
 				})
-				path += ("/" + name)
+				for index := range paths {
+					paths[index] += ("/" + name)
+				}
 			}
 		}
 		if host.conf.UserLowerLetter {
-			path = strings.ToLower(path)
+			for index, p := range paths {
+				paths[index] = strings.ToLower(p)
+			}
 		}
 		if len(methods) == 0 {
 			if hasBody {
@@ -282,11 +293,17 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			if _, existed := host.handlers[httpmethod]; !existed {
 				host.handlers[httpmethod] = &endpoint{}
 			}
-			if err := host.handlers[httpmethod].Add(path, pipeline(handler, middlewares...)); err != nil {
-				return err
-			}
-			if !host.conf.DisableAutoReport {
-				os.Stdout.WriteString(fmt.Sprintf("[%s]\t%s\r\n", httpmethod, path))
+			for index, p := range paths {
+				if err := host.handlers[httpmethod].Add(p, pipeline(handler, middlewares...)); err != nil {
+					return err
+				}
+				methodTag := fmt.Sprintf("[%4s]", smallerMethod(httpmethod))
+				if index > 0 {
+					methodTag = fmt.Sprintf("%6s", ` ↘`)
+				}
+				if !host.conf.DisableAutoReport {
+					os.Stdout.WriteString(fmt.Sprintf("%s\t%s\r\n", methodTag, p))
+				}
 			}
 		}
 	}
@@ -298,6 +315,11 @@ func (host *Host) AddEndpoint(method string, path string, handler HTTPHandler, m
 	{
 		host.initCheck()
 		path = host.basepath + solveBasePath(path)
+		defer func() {
+			if err != nil {
+				host.errList = append(host.errList, err)
+			}
+		}()
 	}
 	if _, existed := host.handlers[method]; !existed {
 		host.handlers[method] = &endpoint{}
@@ -312,6 +334,11 @@ func (host *Host) AddEndpoint(method string, path string, handler HTTPHandler, m
 		os.Stdout.WriteString(fmt.Sprintf("[%s]\t%s\r\n", method, path))
 	}
 	return
+}
+
+//Errors 返回服务器构建时期错误
+func (host *Host) Errors() []error {
+	return host.errList
 }
 
 //runEndpoint 执行端点
@@ -390,6 +417,7 @@ func (host *Host) runEndpoint(method *function, ctx *Context, arguments ...strin
 func (host *Host) initCheck() {
 	if host.handlers == nil {
 		host.handlers = map[string]*endpoint{}
+		host.errList = make([]error, 0)
 	}
 }
 
@@ -439,4 +467,11 @@ func solveBasePath(path string) string {
 		path = path[:len(path)-1]
 	}
 	return path
+}
+
+func smallerMethod(method string) string {
+	if len(method) > 4 {
+		method = method[:4]
+	}
+	return method
 }
