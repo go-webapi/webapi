@@ -28,7 +28,7 @@ type (
 
 		Crypto         CryptoService
 		Serializer     Serializer
-		errorCollector func(*Context, interface{}) interface{}
+		errorCollector func(error) interface{}
 	}
 )
 

@@ -2,6 +2,7 @@ package webapi
 
 import (
 	"errors"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -22,6 +23,87 @@ type (
 		isQuery bool
 	}
 )
+
+func (method *function) Run(ctx *Context, arguments ...string) (objs []interface{}) {
+	args := make([]reflect.Value, 0)
+	if method.Context != nil {
+		obj, callback := createObj(method.Context)
+		obj.FieldByName("Controller").Set(reflect.ValueOf(interface{}(ctx).(Controller)))
+		preArgs := []reflect.Value{}
+		if len(method.ContextArgs) > 0 {
+			//means preconditions required or ctx parameter existed
+			for index, arg := range method.ContextArgs {
+				val := reflect.New(arg).Elem()
+				if err := setValue(val, arguments[index]); err != nil {
+					ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+					return
+				}
+				preArgs = append(preArgs, val)
+			}
+			arguments = arguments[len(method.ContextArgs):]
+			//call init function with parameters which are provided by path(query is excluded)
+			if err := obj.Addr().MethodByName("Init").Call(preArgs)[0]; err.Interface() != nil {
+				ctx.Reply(http.StatusBadRequest, err.Interface().(error))
+				return
+			}
+		}
+		args = append(args, callback(obj))
+	}
+	var index = 0
+	for _, arg := range method.Args {
+		var val reflect.Value
+		if !arg.isBody && !arg.isQuery {
+			//it's a simple param from path(not query)
+			val = reflect.New(arg.Type).Elem()
+			if err := setValue(val, arguments[index]); err != nil {
+				ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+				return
+			}
+			index++
+		} else if arg.isBody {
+			//read and cache body info
+			//this operation will let body canot read any more so
+			//developer can usr ctx.Body() to get them instead reading
+			body := ctx.Body()
+			if len(body) > 0 {
+				if ctx.Crypto != nil {
+					//crypto service
+					body, _ = ctx.Crypto.Decrypt(body)
+				}
+			}
+			//load body structure from body with serializer(default will be JSON)
+			obj, err := arg.Load(body, ctx.Serializer)
+			if obj == nil {
+				if err != nil {
+					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+				} else {
+					ctx.Reply(http.StatusBadRequest)
+				}
+				return
+			}
+			val = *obj
+		} else if arg.isQuery {
+			obj, err := arg.Load(ctx.r.URL.Query())
+			if obj == nil {
+				if err != nil {
+					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+				} else {
+					ctx.Reply(http.StatusBadRequest)
+				}
+				return
+			}
+			val = *obj
+		}
+		args = append(args, val)
+	}
+	//call the function
+	result := method.Function.Call(args)
+	objs = make([]interface{}, len(result))
+	for index, res := range result {
+		objs[index] = res.Interface()
+	}
+	return
+}
 
 //Load Load object from data source
 func (p *param) Load(obj interface{}, serializer ...Serializer) (*reflect.Value, error) {
