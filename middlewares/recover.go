@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/johnwiichang/webapi"
+	"github.com/go-webapi/webapi"
 )
 
 var (
