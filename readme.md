@@ -15,7 +15,7 @@ WebAPI is a basic library for Web API service development for Golang. Using WebA
 
 ### Auto-Registration & Composite Controller
 
-**Focusing on business core avoidance of irrelevant rules, DDD is highly compatible with design patterns such as MVVM. Different business modules have their own controllers (groups), which support the design of module subdivision and multi-module unified integration (allowing multi-person collaboration). Conventional automatic route registration reduces redundant code, improves design efficiency while avoiding the possibility of loss of synchronization between the public address and the internal implementation.**
+**Focusing on business core avoidance of irrelevant rules, DDD is highly compatible with design patterns such as MVVM. Different business modules have their own controller(s), which support the design of module subdivision and multi-module unified integration (allowing multi-person collaboration). Conventional automatic route registration reduces redundant code, improves design efficiency while avoiding the possibility of loss of synchronization between the public address and the internal implementation.**
 
 Declare the controller:
 
@@ -187,7 +187,7 @@ In a test environment of 8 vCPU / 16G RAM TLinux virtual machine (not idle) via 
 | 560      | 1120   | 0.034008s  | 16466.9452 |
 | 580      | 1160   | 0.031361s  | 18494.0912 |
 
-Since the target machine and the pressure-initiating machine are both virtual machines, data jitter is presented. According to actual experience, this jitter does not exist on the physical server. The median overall performance was 12582.88259 (1.2w), and the median recording performance below 1000 was discarded. 16980.15331 (1.7w). Performance is relatively optimistic for a single node.
+Since the target machine and the pressure-initiating machine are both virtual machines, data jitter is presented. According to actual experience, this jitter does not exist on the physical server. The median overall performance was 12582.88259 (12k), and the median recording performance below 1000 was discarded. 16980.15331 (17k). Performance is relatively optimistic for a single node.
 
 ---
 
