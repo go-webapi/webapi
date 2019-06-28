@@ -80,11 +80,11 @@ type Reply struct {
 }
 
 //StatusCode HTTP Status Code
-func (reply *Reply) StatusCode() int {
+func (reply Reply) StatusCode() int {
 	return reply.Status
 }
 
 //Data Body
-func (reply *Reply) Data() interface{} {
+func (reply Reply) Data() interface{} {
 	return reply.Body
 }
