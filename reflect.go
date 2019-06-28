@@ -61,38 +61,52 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 			}
 			index++
 		} else if arg.isBody {
-			//read and cache body info
-			//this operation will let body canot read any more so
-			//developer can usr ctx.Body() to get them instead reading
-			body := ctx.Body()
-			if len(body) > 0 {
-				if ctx.Crypto != nil {
-					//crypto service
-					body, _ = ctx.Crypto.Decrypt(body)
+			var body []byte
+			if ctx.Crypto != nil {
+				//crypto service
+				//read and cache body info
+				//this operation will let body canot read any more so
+				//developer can usr ctx.Body() to get them instead reading
+				if len(ctx.Body()) > 0 {
+					body, _ = ctx.Crypto.Decrypt(ctx.Body())
 				}
 			}
 			//load body structure from body with serializer(default will be JSON)
-			obj, err := arg.Load(body, ctx.Serializer)
-			if obj == nil {
-				if err != nil {
-					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
-				} else {
-					ctx.Reply(http.StatusBadRequest)
+			if ctx.Deserializer != nil {
+				if body == nil {
+					body = ctx.Body()
 				}
-				return
+				obj, err := arg.Load(body, ctx.Deserializer)
+				if obj == nil {
+					if err != nil {
+						ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+					} else {
+						ctx.Reply(http.StatusBadRequest)
+					}
+					return
+				}
+				val = *obj
+			} else {
+				//if cannot found any suitable serializer,
+				//the brand new value will take to method to avoid nil ptr panic.
+				//body val won't read in this situation.
+				val = arg.New()
 			}
-			val = *obj
 		} else if arg.isQuery {
-			obj, err := arg.Load(ctx.r.URL.Query())
-			if obj == nil {
-				if err != nil {
-					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
-				} else {
-					ctx.Reply(http.StatusBadRequest)
+			if values := ctx.r.URL.Query(); len(values) > 0 {
+				obj, err := arg.Load(values, nil)
+				if obj == nil {
+					if err != nil {
+						ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+					} else {
+						ctx.Reply(http.StatusBadRequest)
+					}
+					return
 				}
-				return
+				val = *obj
+			} else {
+				val = arg.New()
 			}
-			val = *obj
 		}
 		args = append(args, val)
 	}
@@ -106,24 +120,26 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 }
 
 //Load Load object from data source
-func (p *param) Load(obj interface{}, serializer ...Serializer) (*reflect.Value, error) {
+func (p *param) Load(obj interface{}, serializer Serializer) (*reflect.Value, error) {
 	if b, isBytes := obj.([]byte); isBytes {
-		return p.loadFromBytes(b, serializer...)
+		return p.loadFromBytes(b, serializer)
 	} else if values, isValues := obj.(url.Values); isValues {
 		return p.loadFromValues(values)
 	}
 	return nil, errors.New("cannot accept input type " + reflect.TypeOf(obj).Name())
 }
 
+func (p *param) New() reflect.Value {
+	val, function := createObj(p.Type)
+	return function(val)
+}
+
 //loadFromBytes Load object from bytes
-func (p *param) loadFromBytes(body []byte, serializer ...Serializer) (*reflect.Value, error) {
-	if len(serializer) == 0 {
-		serializer = []Serializer{JSONSerializer}
-	}
+func (p *param) loadFromBytes(body []byte, serializer Serializer) (*reflect.Value, error) {
 	obj, callback := createObj(p.Type)
 	if len(body) > 0 {
 		entityObj := obj.Addr().Interface()
-		serializer[0].Unmarshal(body, entityObj)
+		serializer.Unmarshal(body, entityObj)
 		if checkObj, checkable := entityObj.(Validator); checkable {
 			if err := checkObj.Check(); err != nil {
 				return nil, err

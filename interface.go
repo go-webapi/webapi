@@ -1,7 +1,6 @@
 package webapi
 
 import (
-	"encoding/json"
 	"net/http"
 )
 
@@ -59,32 +58,3 @@ type (
 		Stop()
 	}
 )
-
-//JSONSerializer JSON Serializer
-var JSONSerializer Serializer = &jsonSerializer{}
-
-type jsonSerializer struct{}
-
-func (*jsonSerializer) Marshal(obj interface{}) ([]byte, error) {
-	return json.Marshal(obj)
-}
-
-func (*jsonSerializer) Unmarshal(src []byte, obj interface{}) error {
-	return json.Unmarshal(src, obj)
-}
-
-//Reply Default implementation of Response
-type Reply struct {
-	Status int
-	Body   interface{}
-}
-
-//StatusCode HTTP Status Code
-func (reply Reply) StatusCode() int {
-	return reply.Status
-}
-
-//Data Body
-func (reply Reply) Data() interface{} {
-	return reply.Body
-}

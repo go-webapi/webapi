@@ -116,7 +116,7 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := &Context{
 		w:              w,
 		r:              r,
-		Serializer:     JSONSerializer,
+		Deserializer:   Serializers[strings.Split(r.Header.Get("Content-Type"), ";")[0]],
 		errorCollector: host.ErrorHandler,
 	}
 	handler.(httpHandler)(ctx, args...)
