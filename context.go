@@ -27,6 +27,7 @@ type (
 		predecessors []Middleware
 
 		Crypto         CryptoService
+		Deserializer   Serializer
 		Serializer     Serializer
 		errorCollector func(error) interface{}
 	}
@@ -49,6 +50,12 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 			data = []byte(obj[0].(error).Error())
 			break
 		default:
+			//serializer is using for reply now.
+			//use deserializer to handle body data instead.
+			if ctx.Serializer == nil {
+				//default is json.
+				ctx.Serializer = Serializers["application/json"]
+			}
 			data, err = ctx.Serializer.Marshal(obj)
 		}
 		if err != nil {
