@@ -24,6 +24,12 @@ type (
 )
 
 type (
+	//Replyable Replyable for request reply
+	Replyable interface {
+		StatusCode() int
+		Data() interface{}
+	}
+
 	//CryptoService Cryptography service
 	CryptoService interface {
 		Encrypt([]byte) []byte
@@ -65,4 +71,20 @@ func (*jsonSerializer) Marshal(obj interface{}) ([]byte, error) {
 
 func (*jsonSerializer) Unmarshal(src []byte, obj interface{}) error {
 	return json.Unmarshal(src, obj)
+}
+
+//Reply Default implementation of Response
+type Reply struct {
+	Status int
+	Body   interface{}
+}
+
+//StatusCode HTTP Status Code
+func (reply *Reply) StatusCode() int {
+	return reply.Status
+}
+
+//Data Body
+func (reply *Reply) Data() interface{} {
+	return reply.Body
 }

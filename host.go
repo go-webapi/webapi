@@ -311,7 +311,14 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				//if status code is zero, means the reply didn't handle by method
 				if len(reply) > 0 {
 					//try to reply with the return value
-					ctx.Reply(http.StatusOK, reply[0])
+					response, isResp := reply[0].(Replyable)
+					if !isResp {
+						response = &Reply{
+							Status: http.StatusOK,
+							Body:   reply[0],
+						}
+					}
+					ctx.Reply(response.StatusCode(), response.Data())
 				} else {
 					//no info can give back to client
 					ctx.Reply(http.StatusNoContent)
