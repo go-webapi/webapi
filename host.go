@@ -331,6 +331,11 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			}
 			for index, p := range paths {
 				if err := host.handlers[httpmethod].Add(p, pipeline(handler, middlewares...)); err != nil {
+					if index > 0 {
+						//if the alias is already existed,
+						//jump it directly.
+						continue
+					}
 					return err
 				}
 				if !host.conf.DisableAutoReport {
