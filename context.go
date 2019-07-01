@@ -36,7 +36,7 @@ type (
 //Reply Reply to client with any data which can be marshaled into bytes if not bytes or string
 func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	var data []byte
-	if len(obj) > 0 {
+	if len(obj) > 0 && obj[0] != nil {
 		switch obj[0].(type) {
 		case string:
 			//trans to bytes with utf8 encoding
