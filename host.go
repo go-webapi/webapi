@@ -182,7 +182,11 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				//need element not reference
 				temp = temp.Elem()
 			}
-			basePath += "/" + temp.Name()
+			if len(temp.Name()) > len("Controller") && strings.ToLower(temp.Name()[len(temp.Name())-len("Controller"):]) == "controller" {
+				basePath += "/" + temp.Name()[0:len(temp.Name())-len("Controller")]
+			} else {
+				basePath += "/" + temp.Name()
+			}
 		}
 	}
 	//check prefix request parameters
