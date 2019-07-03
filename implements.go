@@ -83,8 +83,3 @@ func (reply Reply) StatusCode() int {
 func (reply Reply) Data() interface{} {
 	return reply.Body
 }
-
-type Page struct {
-	Data interface{}
-	File string
-}
