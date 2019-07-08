@@ -42,7 +42,7 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 		entity := reflect.ValueOf(obj[0])
 	begin:
 		value := entity.Interface()
-		if kind := entity.Kind(); kind == reflect.Struct {
+		if kind := entity.Kind(); kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice || kind == reflect.Array {
 			//serializer is using for reply now.
 			//use deserializer to handle body data instead.
 			if ctx.Serializer == nil {
