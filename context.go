@@ -3,6 +3,7 @@ package webapi
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -80,7 +81,9 @@ func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	if ctx.statuscode == 0 {
 		ctx.statuscode = httpstatus
 		ctx.w.WriteHeader(httpstatus)
-		_, err = ctx.w.Write(data)
+		if len(data) > 0 {
+			_, err = ctx.w.Write(data)
+		}
 	} else {
 		err = errors.New("the last written with " + strconv.Itoa(ctx.statuscode) + " has been submitted")
 	}
@@ -116,6 +119,11 @@ func (ctx *Context) Context() *Context {
 //GetRequest Get Request from Context
 func (ctx *Context) GetRequest() *http.Request {
 	return ctx.r
+}
+
+//GetResponseWriter Get ResponseWriter as io.Writer to support stream write
+func (ctx *Context) GetResponseWriter() io.Writer {
+	return ctx.w
 }
 
 //Body The Body Bytes from Context
