@@ -378,7 +378,7 @@ func (host *Host) AddEndpoint(method string, path string, handler HTTPHandler, m
 		handler(context)
 	}, middlewares...))
 	if !host.conf.DisableAutoReport {
-		os.Stdout.WriteString(fmt.Sprintf("[%s]\t%s\r\n", method, path))
+		os.Stdout.WriteString(fmt.Sprintf("[%4s]\t%s\r\n", method, path))
 	}
 	return
 }

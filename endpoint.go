@@ -41,9 +41,8 @@ func (n *endpoint) setVal(value interface{}, path ...string) (err error) {
 		if n.val == nil {
 			n.val = value
 			return
-		} else {
-			return errors.New("the endpoint is already existed")
 		}
+		return errors.New("the endpoint is already existed")
 	}
 	name := path[0]
 	if _, existed := n.nodes[name]; !existed {

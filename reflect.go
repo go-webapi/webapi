@@ -28,24 +28,27 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 	args := make([]reflect.Value, 0)
 	if method.Context != nil {
 		obj, callback := createObj(method.Context)
-		obj.FieldByName("Controller").Set(reflect.ValueOf(interface{}(ctx).(Controller)))
-		preArgs := []reflect.Value{}
-		if len(method.ContextArgs) > 0 {
-			//means preconditions required or ctx parameter existed
-			for index, arg := range method.ContextArgs {
-				val := reflect.New(arg).Elem()
-				if err := setValue(val, arguments[index]); err != nil {
-					ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+		if setController(obj, reflect.ValueOf(interface{}(ctx).(Controller))) {
+			preArgs := []reflect.Value{}
+			if method.ContextArgs != nil {
+				//means preconditions required or ctx parameter existed
+				for index, arg := range method.ContextArgs {
+					val := reflect.New(arg).Elem()
+					if err := setValue(val, arguments[index]); err != nil {
+						ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+						return
+					}
+					preArgs = append(preArgs, val)
+				}
+				arguments = arguments[len(method.ContextArgs):]
+				//call init function with parameters which are provided by path(query is excluded)
+				if err := obj.Addr().MethodByName("Init").Call(preArgs)[0]; err.Interface() != nil {
+					ctx.Reply(http.StatusBadRequest, err.Interface().(error))
 					return
 				}
-				preArgs = append(preArgs, val)
 			}
-			arguments = arguments[len(method.ContextArgs):]
-			//call init function with parameters which are provided by path(query is excluded)
-			if err := obj.Addr().MethodByName("Init").Call(preArgs)[0]; err.Interface() != nil {
-				ctx.Reply(http.StatusBadRequest, err.Interface().(error))
-				return
-			}
+		} else {
+			panic("cannot found any context entrance")
 		}
 		args = append(args, callback(obj))
 	}
@@ -243,4 +246,24 @@ func setArray(value reflect.Value, data []string) (err error) {
 		}
 	}
 	return nil
+}
+
+//setController assign to actual field if there is a embedded controller
+func setController(value reflect.Value, controller reflect.Value) bool {
+	for index := 0; index < value.NumField(); index++ {
+		field := value.Field(index)
+		if field.Kind() == reflect.Interface {
+			field.Set(controller)
+			return true
+		} else if field.Kind() == reflect.Ptr {
+			//create entity for each field
+			field, callback := createObj(field.Type())
+			if setController(field, controller) {
+				//set to controller
+				value.Field(index).Set(callback(field))
+				return true
+			}
+		}
+	}
+	return false
 }

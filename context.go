@@ -2,8 +2,10 @@ package webapi
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strconv"
 )
 
@@ -37,26 +39,31 @@ type (
 func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	var data []byte
 	if len(obj) > 0 && obj[0] != nil {
-		switch obj[0].(type) {
-		case string:
-			//trans to bytes with utf8 encoding
-			data = []byte(obj[0].(string))
-			break
-		case []byte:
-			//direct
-			data = obj[0].([]byte)
-			break
-		case error:
-			data = []byte(obj[0].(error).Error())
-			break
-		default:
+		entity := reflect.ValueOf(obj[0])
+	begin:
+		value := entity.Interface()
+		if kind := entity.Kind(); kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice || kind == reflect.Array {
 			//serializer is using for reply now.
 			//use deserializer to handle body data instead.
 			if ctx.Serializer == nil {
 				//default is json.
 				ctx.Serializer = Serializers["application/json"]
 			}
-			data, err = ctx.Serializer.Marshal(obj)
+			data, err = ctx.Serializer.Marshal(value)
+		} else if _, iserr := value.(error); !iserr && kind == reflect.Ptr {
+			entity = entity.Elem()
+			goto begin
+		} else {
+			switch value.(type) {
+			case []byte:
+				data = value.([]byte)
+				break
+			case error:
+				data = []byte(value.(error).Error())
+				break
+			default:
+				data = []byte(fmt.Sprintf("%v", value))
+			}
 		}
 		if err != nil {
 			return
