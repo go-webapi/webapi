@@ -7,7 +7,7 @@
  
 ```
 
-[中文](https://github.com/go-webapi/webapi/blob/master/readme.zh-cn.md) | English
+[中文](https://github.com/go-webapi/webapi/blob/master/readme.zh-cn.md) | English | [![Build Status](https://travis-ci.org/go-webapi/webapi.svg?branch=master)](https://travis-ci.org/go-webapi/webapi)
 
 WebAPI is a basic library for Web API service development for Golang. Using WebAPI can effectively reduce the probability of coding errors and avoid boring duplicate code. WebAPI for Golang is inspired by Microsoft ASP.NET Core, so if you are familiar with .NET or JavaEE developers, you will be well equipped.
 
