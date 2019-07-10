@@ -107,7 +107,7 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if host.conf.UserLowerLetter {
 		path = strings.ToLower(path)
 	}
-	handler, args := collection.Search(r.URL.Path)
+	handler, args := collection.Search(path)
 	if handler == nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
