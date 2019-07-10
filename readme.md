@@ -6,8 +6,9 @@
  \_\/\/ |_|__ |_|_) /_/--\ |_|   |_| 
  
 ```
+[![Build Status](https://travis-ci.org/go-webapi/webapi.svg?branch=master)](https://travis-ci.org/go-webapi/webapi) [![Go Report Card](https://goreportcard.com/badge/github.com/go-webapi/webapi)](https://goreportcard.com/report/github.com/go-webapi/webapi) [![Open Source Helpers](https://www.codetriage.com/go-webapi/webapi/badges/users.svg)](https://www.codetriage.com/go-webapi/webapi) 
 
-[中文](https://github.com/go-webapi/webapi/blob/master/readme.zh-cn.md) | English | [![Build Status](https://travis-ci.org/go-webapi/webapi.svg?branch=master)](https://travis-ci.org/go-webapi/webapi)
+[中文](https://github.com/go-webapi/webapi/blob/master/readme.zh-cn.md) | English
 
 WebAPI is a basic library for Web API service development for Golang. Using WebAPI can effectively reduce the probability of coding errors and avoid boring duplicate code. WebAPI for Golang is inspired by Microsoft ASP.NET Core, so if you are familiar with .NET or JavaEE developers, you will be well equipped.
 

@@ -7,7 +7,9 @@
  
 ```
 
- [English](https://github.com/go-webapi/webapi/blob/master/readme.md) | 中文 | [![Build Status](https://travis-ci.org/go-webapi/webapi.svg?branch=master)](https://travis-ci.org/go-webapi/webapi)
+[![Build Status](https://travis-ci.org/go-webapi/webapi.svg?branch=master)](https://travis-ci.org/go-webapi/webapi) [![Go Report Card](https://goreportcard.com/badge/github.com/go-webapi/webapi)](https://goreportcard.com/report/github.com/go-webapi/webapi) [![Open Source Helpers](https://www.codetriage.com/go-webapi/webapi/badges/users.svg)](https://www.codetriage.com/go-webapi/webapi) 
+
+ [English](https://github.com/go-webapi/webapi/blob/master/readme.md) | 中文
 
 WebAPI 是一个适用于 Golang 的 Web API 服务开发的基础库。使用 WebAPI 可以有效降低编码出错的概率并回避无聊的重复代码。WebAPI for Golang 灵感来源于 Microsoft ASP.NET Core，所以如果对于 .NET 或者 JavaEE 熟悉的开发者而言，定会游刃有余。
 
