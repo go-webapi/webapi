@@ -29,6 +29,19 @@ var (
 	}{
 		"method",
 	}
+
+	//supported http request methods dictionary
+	supportedMthods = map[string]bool{
+		http.MethodConnect: true,
+		http.MethodDelete:  true,
+		http.MethodGet:     true,
+		http.MethodHead:    true,
+		http.MethodOptions: true,
+		http.MethodPatch:   true,
+		http.MethodPost:    true,
+		http.MethodPut:     true,
+		http.MethodTrace:   true,
+	}
 )
 
 func init() {
@@ -103,7 +116,7 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 		return
 	}
-	path := r.URL.Path
+	var path = r.URL.Path
 	if host.conf.UserLowerLetter {
 		path = strings.ToLower(path)
 	}
@@ -182,8 +195,8 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				//need element not reference
 				temp = temp.Elem()
 			}
-			if len(temp.Name()) > len("Controller") && strings.ToLower(temp.Name()[len(temp.Name())-len("Controller"):]) == "controller" {
-				basePath += "/" + temp.Name()[0:len(temp.Name())-len("Controller")]
+			if index := strings.Index(strings.ToLower(temp.Name()), "controller"); index > 0 && index+10 == len(temp.Name()) {
+				basePath += "/" + temp.Name()[0:index]
 			} else {
 				basePath += "/" + temp.Name()
 			}
@@ -246,12 +259,9 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				if _, errorOccurred := temp.FieldByNameFunc(func(name string) bool {
 					if strings.Index(name, reservedNamedStructure.Method) == 0 {
 						//only field start with 'method' will be processed
-						switch httpmethod := strings.ToUpper(strings.Replace(name, reservedNamedStructure.Method, "", 1)); httpmethod {
-						case http.MethodConnect, http.MethodDelete, http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodPatch, http.MethodPost, http.MethodPut, http.MethodTrace:
+						if httpmethod := strings.ToUpper(strings.Replace(name, reservedNamedStructure.Method, "", 1)); supportedMthods[httpmethod] {
 							methods[httpmethod] = true
-							break
-						default:
-							//this request form is unsupported
+						} else {
 							err = errors.New("cannot accept '" + httpmethod + "' method at method '" + method.Name + "' of '" + basePath + "'")
 							return true
 						}
