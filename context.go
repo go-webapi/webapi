@@ -10,6 +10,16 @@ import (
 	"strconv"
 )
 
+var (
+	//these types can be marshaled to []byte directlty
+	marshalableKinds = map[reflect.Kind]bool{
+		reflect.Struct: true,
+		reflect.Map:    true,
+		reflect.Slice:  true,
+		reflect.Array:  true,
+	}
+)
+
 type (
 	//Middleware Middleware
 	Middleware interface {
@@ -43,7 +53,7 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 		entity := reflect.ValueOf(obj[0])
 	begin:
 		value := entity.Interface()
-		if kind := entity.Kind(); kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice || kind == reflect.Array {
+		if kind := entity.Kind(); marshalableKinds[kind] {
 			//serializer is using for reply now.
 			//use deserializer to handle body data instead.
 			if ctx.Serializer == nil {
@@ -70,7 +80,10 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 			return
 		}
 		if httpstatus < 300 && ctx.Crypto != nil {
+			//only if status is 2XX the data will be encrypted
 			data = ctx.Crypto.Encrypt(data)
+			//this design might not pretty good for all of situation,
+			//plan to change to a setting and give developer some choices in the future.
 		}
 	}
 	return ctx.Write(httpstatus, data)
