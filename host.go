@@ -173,6 +173,10 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				host.errList = append(host.errList, err)
 			}
 		}()
+		if len(host.mstack) > 0 {
+			//stack data will used to set prior middlewares
+			middlewares = append(host.mstack, middlewares...)
+		}
 	}
 	val := reflect.ValueOf(controller)
 	typ := val.Type()
@@ -226,10 +230,6 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		if asideDict[method.Name] || (method.Name == "Init" && contextArgs != nil) {
 			//a special keyword flushed
 			continue
-		}
-		if len(host.mstack) > 0 {
-			//stack data will used to set prior middlewares
-			middlewares = append(host.mstack, middlewares...)
 		}
 		ep := function{
 			//created function entity to ready the endpoint
