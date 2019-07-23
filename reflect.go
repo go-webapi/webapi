@@ -48,31 +48,22 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 				}
 			}
 		} else {
-			panic("cannot found any context entrance")
+			ctx.Reply(http.StatusNotFound)
+			return
 		}
 		args = append(args, callback(obj))
 	}
 	var index = 0
 	for _, arg := range method.Args {
 		var val reflect.Value
-		if !arg.isBody && !arg.isQuery {
-			//it's a simple param from path(not query)
-			val = reflect.New(arg.Type).Elem()
-			if err := setValue(val, arguments[index]); err != nil {
-				ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
-				return
-			}
-			index++
-		} else if arg.isBody {
+		if arg.isBody {
 			var body []byte
-			if ctx.Crypto != nil {
+			if ctx.Crypto != nil && len(ctx.Body()) > 0 {
 				//crypto service
 				//read and cache body info
 				//this operation will let body canot read any more so
 				//developer can usr ctx.Body() to get them instead reading
-				if len(ctx.Body()) > 0 {
-					body, _ = ctx.Crypto.Decrypt(ctx.Body())
-				}
+				body, _ = ctx.Crypto.Decrypt(ctx.Body())
 			}
 			//load body structure from body with serializer(default will be JSON)
 			if ctx.Deserializer != nil {
@@ -110,6 +101,14 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 			} else {
 				val = arg.New()
 			}
+		} else {
+			//it's a simple param from path(not query)
+			val = reflect.New(arg.Type).Elem()
+			if err := setValue(val, arguments[index]); err != nil {
+				ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+				return
+			}
+			index++
 		}
 		args = append(args, val)
 	}
