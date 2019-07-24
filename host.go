@@ -332,7 +332,14 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 							Body:   reply[0],
 						}
 					}
-					ctx.Reply(response.StatusCode(), response.Data())
+					statusCode := response.StatusCode()
+					if statusCode == 0 {
+						statusCode = http.StatusOK
+						if response.Data() == nil {
+							statusCode = http.StatusNoContent
+						}
+					}
+					ctx.Reply(statusCode, response.Data())
 				} else {
 					//no info can give back to client
 					ctx.Reply(http.StatusNoContent)
