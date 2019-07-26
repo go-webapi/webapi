@@ -71,12 +71,8 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 					body = ctx.Body()
 				}
 				obj, err := arg.Load(body, ctx.Deserializer)
-				if obj == nil {
-					if err != nil {
-						ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
-					} else {
-						ctx.Reply(http.StatusBadRequest)
-					}
+				if err != nil {
+					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
 					return
 				}
 				val = *obj
@@ -87,28 +83,34 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 				val = arg.New()
 			}
 		} else if arg.isQuery {
-			if values := ctx.r.URL.Query(); len(values) > 0 {
-				obj, err := arg.Load(values, nil)
-				if obj == nil {
-					if err != nil {
-						ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
-					} else {
-						ctx.Reply(http.StatusBadRequest)
-					}
-					return
+			obj, err := arg.Load(ctx.r.URL.Query(), nil)
+			if obj == nil {
+				if err != nil {
+					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+				} else {
+					ctx.Reply(http.StatusBadRequest)
 				}
-				val = *obj
-			} else {
-				val = arg.New()
+				return
 			}
+			val = *obj
 		} else {
 			//it's a simple param from path(not query)
 			val = reflect.New(arg.Type).Elem()
 			if err := setValue(val, arguments[index]); err != nil {
-				ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
 				return
 			}
 			index++
+		}
+		check := val.Interface()
+		if val.CanAddr() {
+			check = val.Addr().Interface()
+		}
+		if checker, checkable := check.(Validator); checkable {
+			if err := checker.Check(); err != nil {
+				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+				return
+			}
 		}
 		args = append(args, val)
 	}
@@ -142,14 +144,9 @@ func (p *param) loadFromBytes(body []byte, serializer Serializer) (*reflect.Valu
 	if len(body) > 0 {
 		entityObj := obj.Addr().Interface()
 		serializer.Unmarshal(body, entityObj)
-		if checkObj, checkable := entityObj.(Validator); checkable {
-			if err := checkObj.Check(); err != nil {
-				return nil, err
-			}
-		}
 		obj = callback(reflect.ValueOf(entityObj))
 	} else {
-		obj = reflect.Zero(p.Type)
+		obj = callback(obj)
 	}
 	return &obj, nil
 }
@@ -158,29 +155,24 @@ func (p *param) loadFromBytes(body []byte, serializer Serializer) (*reflect.Valu
 func (p *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
 	obj, callback := createObj(p.Type)
 	objType := obj.Type()
-	for fieldIndex := 0; fieldIndex < objType.NumField(); fieldIndex++ {
-		field := obj.Field(fieldIndex)
-		if field.CanSet() {
-			ftyp := objType.Field(fieldIndex)
-			name := ftyp.Tag.Get("json")
-			if len(name) == 0 {
-				name = ftyp.Name
-			}
-			if len(name) > 0 && name != "-" {
-				setValue(field, queries.Get(name))
-			}
-		}
-	}
-	{
-		objInstance := obj.Addr().Interface()
-		if checkObj, checkable := objInstance.(Validator); checkable {
-			if err := checkObj.Check(); err != nil {
-				return nil, err
+	if len(queries) > 0 {
+		for fieldIndex := 0; fieldIndex < objType.NumField(); fieldIndex++ {
+			field := obj.Field(fieldIndex)
+			if field.CanSet() {
+				ftyp := objType.Field(fieldIndex)
+				name := ftyp.Tag.Get("json")
+				if len(name) == 0 {
+					name = ftyp.Name
+				}
+				if len(name) > 0 && name != "-" {
+					setValue(field, queries.Get(name))
+				}
 			}
 		}
-		obj = reflect.ValueOf(objInstance)
+		obj = callback(obj)
+	} else {
+		obj = callback(obj)
 	}
-	obj = callback(obj)
 	return &obj, nil
 }
 
