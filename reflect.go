@@ -102,13 +102,9 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 			}
 			index++
 		}
-		check := val.Interface()
-		if val.CanAddr() {
-			check = val.Addr().Interface()
-		}
-		if checker, checkable := check.(Validator); checkable {
-			if err := checker.Check(); err != nil {
-				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+		if checker := val.MethodByName("Check"); !checker.IsNil() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == reflect.TypeOf((*error)(nil)).Elem() {
+			if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
+				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err.(error)))
 				return
 			}
 		}
