@@ -136,15 +136,16 @@ func (p *param) New() reflect.Value {
 
 //loadFromBytes Load object from bytes
 func (p *param) loadFromBytes(body []byte, serializer Serializer) (*reflect.Value, error) {
+	var err error
 	obj, callback := createObj(p.Type)
 	if len(body) > 0 {
 		entityObj := obj.Addr().Interface()
-		serializer.Unmarshal(body, entityObj)
+		err = serializer.Unmarshal(body, entityObj)
 		obj = callback(reflect.ValueOf(entityObj))
 	} else {
 		obj = callback(obj)
 	}
-	return &obj, nil
+	return &obj, err
 }
 
 //loadFromValues Load object from url.Values
