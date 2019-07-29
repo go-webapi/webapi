@@ -102,7 +102,7 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 			}
 			index++
 		}
-		if checker := val.MethodByName("Check"); !checker.IsNil() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == reflect.TypeOf((*error)(nil)).Elem() {
+		if checker := val.MethodByName("Check"); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == reflect.TypeOf((*error)(nil)).Elem() {
 			if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
 				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err.(error)))
 				return
