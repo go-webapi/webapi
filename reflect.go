@@ -92,7 +92,7 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 				}
 				return
 			}
-			val = *obj
+			val = (*obj).Addr()
 		} else {
 			//it's a simple param from path(not query)
 			val = reflect.New(arg.Type).Elem()
@@ -107,6 +107,9 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err.(error)))
 				return
 			}
+		}
+		if arg.isQuery {
+			val = val.Elem()
 		}
 		args = append(args, val)
 	}
