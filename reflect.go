@@ -154,26 +154,47 @@ func (p *param) loadFromBytes(body []byte, serializer Serializer) (*reflect.Valu
 //loadFromValues Load object from url.Values
 func (p *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
 	obj, callback := createObj(p.Type)
-	objType := obj.Type()
 	if len(queries) > 0 {
-		for fieldIndex := 0; fieldIndex < objType.NumField(); fieldIndex++ {
-			field := obj.Field(fieldIndex)
-			if field.CanSet() {
-				ftyp := objType.Field(fieldIndex)
-				name := ftyp.Tag.Get("json")
-				if len(name) == 0 {
-					name = ftyp.Name
-				}
-				if len(name) > 0 && name != "-" {
-					setValue(field, queries.Get(name))
-				}
-			}
-		}
+		// for fieldIndex := 0; fieldIndex < objType.NumField(); fieldIndex++ {
+		// 	field := obj.Field(fieldIndex)
+		// 	if field.CanSet() {
+		// 		ftyp := objType.Field(fieldIndex)
+		// 		name := ftyp.Tag.Get("json")
+		// 		if len(name) == 0 {
+		// 			name = ftyp.Name
+		// 		}
+		// 		if len(name) > 0 && name != "-" {
+		// 			setValue(field, queries.Get(name))
+		// 		}
+		// 	}
+		// }
+		setObj(obj, queries)
 		obj = callback(obj)
 	} else {
 		obj = callback(obj)
 	}
 	return &obj, nil
+}
+
+func setObj(value reflect.Value, queries url.Values) {
+	t := value.Type()
+	for i := 0; i < value.NumField(); i++ {
+		field := value.Field(i)
+		if field.Kind() == reflect.Struct {
+			setObj(field, queries)
+			continue
+		}
+		if field.CanSet() {
+			ftyp := t.Field(i)
+			name := ftyp.Tag.Get("json")
+			if len(name) == 0 {
+				name = ftyp.Name
+			}
+			if len(name) > 0 && name != "-" {
+				setValue(field, queries.Get(name))
+			}
+		}
+	}
 }
 
 //createObj Create writable object and return a function which can set back to actual type
