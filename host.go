@@ -70,6 +70,7 @@ type (
 
 		//Stack data
 		basepath     string
+		global       []Middleware
 		mstack       []Middleware
 		ErrorHandler func(error) interface{}
 	}
@@ -91,7 +92,8 @@ func NewHost(conf Config, middlewares ...Middleware) (host *Host) {
 		conf:     conf,
 
 		basepath: "",
-		mstack:   middlewares,
+		global:   middlewares,
+		mstack:   []Middleware{},
 	}
 	if !conf.DisableAutoReport {
 		os.Stdout.WriteString("Registration Info:\r\n")
@@ -110,8 +112,14 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Body != nil {
 		defer r.Body.Close()
 	}
+	ctx := &Context{
+		w:              w,
+		r:              r,
+		Deserializer:   Serializers[strings.Split(r.Header.Get("Content-Type"), ";")[0]],
+		errorCollector: host.ErrorHandler,
+	}
 	collection := host.handlers[strings.ToUpper(r.Method)]
-	if collection == nil {
+	if collection == nil && r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 		return
@@ -122,25 +130,20 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	handler, args := collection.Search(path)
 	if handler == nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(http.StatusText(http.StatusNotFound)))
-		return
+		handler = httpHandler(func(*Context, ...string) {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(http.StatusText(http.StatusNotFound)))
+		})
 	}
-	ctx := &Context{
-		w:              w,
-		r:              r,
-		Deserializer:   Serializers[strings.Split(r.Header.Get("Content-Type"), ";")[0]],
-		errorCollector: host.ErrorHandler,
-	}
-	handler.(httpHandler)(ctx, args...)
+	pipeline(handler.(httpHandler), host.global...)(ctx, args...)
 }
 
 //Use Add middlewares into host
 func (host *Host) Use(middlewares ...Middleware) *Host {
 	if host.mstack == nil {
-		host.mstack = middlewares
+		host.global = middlewares
 	} else {
-		host.mstack = append(host.mstack, middlewares...)
+		host.global = append(host.global, middlewares...)
 	}
 	return host
 }
