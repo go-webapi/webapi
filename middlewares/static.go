@@ -35,12 +35,11 @@ func SetupStaticFileSupport(address string, folder string) webapi.Middleware {
 }
 
 func (handler *StaticFileHandler) Invoke(ctx *webapi.Context, next webapi.HTTPHandler) {
+	next(ctx)
 	path := ctx.GetRequest().URL.Path
 	if strings.Index(path, handler.address) == 0 {
 		ctx.GetRequest().URL.Path = strings.Replace(path, handler.address, "", 1)
 		handler.server.ServeHTTP(&respWriter{ctx: ctx}, ctx.GetRequest())
-	} else {
-		next(ctx)
 	}
 }
 

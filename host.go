@@ -70,7 +70,7 @@ type (
 
 		//Stack data
 		basepath     string
-		global       []Middleware
+		global       httpHandler
 		mstack       []Middleware
 		ErrorHandler func(error) interface{}
 	}
@@ -92,8 +92,8 @@ func NewHost(conf Config, middlewares ...Middleware) (host *Host) {
 		conf:     conf,
 
 		basepath: "",
-		global:   middlewares,
-		mstack:   []Middleware{},
+		global:   pipeline(nil, middlewares...),
+		mstack:   middlewares,
 	}
 	if !conf.DisableAutoReport {
 		os.Stdout.WriteString("Registration Info:\r\n")
@@ -119,32 +119,38 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		errorCollector: host.ErrorHandler,
 	}
 	collection := host.handlers[strings.ToUpper(r.Method)]
-	if collection == nil && r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(http.StatusText(http.StatusNotFound)))
-		return
-	}
-	var path = r.URL.Path
-	if host.conf.UserLowerLetter {
-		path = strings.ToLower(path)
-	}
-	handler, args := collection.Search(path)
-	if handler == nil {
-		handler = httpHandler(func(*Context, ...string) {
+	var run, args = host.global, []string{}
+	if collection == nil {
+		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(http.StatusText(http.StatusNotFound)))
-		})
+			return
+		}
+	} else {
+		var path = r.URL.Path
+		if host.conf.UserLowerLetter {
+			path = strings.ToLower(path)
+		}
+		handler, arguments := collection.Search(path)
+		if handler != nil {
+			run = handler.(httpHandler)
+			args = arguments
+		}
 	}
-	pipeline(handler.(httpHandler), host.global...)(ctx, args...)
+	run(ctx, args...)
+	if ctx.statuscode == 0 {
+		ctx.Reply(http.StatusNotFound, http.StatusText(http.StatusNotFound))
+	}
 }
 
 //Use Add middlewares into host
 func (host *Host) Use(middlewares ...Middleware) *Host {
 	if host.mstack == nil {
-		host.global = middlewares
+		host.mstack = middlewares
 	} else {
-		host.global = append(host.global, middlewares...)
+		host.mstack = append(host.mstack, middlewares...)
 	}
+	host.global = pipeline(host.global, middlewares...)
 	return host
 }
 
@@ -425,6 +431,9 @@ func pipeline(handler httpHandler, middlewares ...Middleware) httpHandler {
 	complexHandler := func(ctx *Context, args ...string) {
 		//create a composite pipeline using middleware
 		middleware.Invoke(ctx, func(arguments ...string) HTTPHandler {
+			if handler == nil {
+				return func(*Context) {}
+			}
 			return func(context *Context) {
 				handler(context, arguments...)
 			}
