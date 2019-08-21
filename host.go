@@ -398,6 +398,9 @@ func (host *Host) AddEndpoint(method string, path string, handler HTTPHandler, m
 		handler(context)
 	}, middlewares...))
 	if !host.conf.DisableAutoReport {
+		if len(path) == 0 {
+			path = "/"
+		}
 		os.Stdout.WriteString(fmt.Sprintf("[%4s]\t%s\r\n", method, path))
 	}
 	return
@@ -462,7 +465,7 @@ func solveBasePath(path string) string {
 	if len(path) == 0 || path[0] != '/' {
 		path = "/" + path
 	}
-	if len(path) > 1 && path[len(path)-1] == '/' {
+	if len(path) > 0 && path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
 	}
 	return path

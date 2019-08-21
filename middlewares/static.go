@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/go-webapi/webapi"
@@ -10,14 +11,18 @@ import (
 type (
 	//StaticFileHandler 静态文件
 	StaticFileHandler struct {
-		address string
-		folder  string
-		server  http.Handler
+		address    string
+		folder     string
+		listfolder bool
+		server     http.Handler
 	}
 )
 
 //SetupStaticFileSupport 静态文件支持
-func SetupStaticFileSupport(address string, folder string) webapi.Middleware {
+func SetupStaticFileSupport(address string, folder string, displayDir ...bool) webapi.Middleware {
+	if len(displayDir) == 0 {
+		displayDir = []bool{false}
+	}
 	if len(folder) > 0 && folder[len(folder)-1] != '/' {
 		folder += "/"
 	}
@@ -28,19 +33,22 @@ func SetupStaticFileSupport(address string, folder string) webapi.Middleware {
 		address = "/" + address
 	}
 	return &StaticFileHandler{
-		address: address,
-		folder:  folder,
-		server:  http.FileServer(http.Dir(folder)),
+		address:    address,
+		folder:     folder,
+		listfolder: displayDir[0],
+		server:     http.FileServer(http.Dir(folder)),
 	}
 }
 
 func (handler *StaticFileHandler) Invoke(ctx *webapi.Context, next webapi.HTTPHandler) {
 	next(ctx)
 	if ctx.StatusCode() == 0 && ctx.GetRequest().Method == http.MethodGet {
-		path := ctx.GetRequest().URL.Path
-		if strings.Index(path, handler.address) == 0 {
-			ctx.GetRequest().URL.Path = strings.Replace(path, handler.address, "", 1)
-			handler.server.ServeHTTP(&respWriter{ctx: ctx}, ctx.GetRequest())
+		filepath := ctx.GetRequest().URL.Path
+		if _, filename := path.Split(filepath); len(filename) > 0 || handler.listfolder {
+			if strings.Index(filepath, handler.address) == 0 {
+				ctx.GetRequest().URL.Path = strings.Replace(filepath, handler.address, "", 1)
+				handler.server.ServeHTTP(&respWriter{ctx: ctx}, ctx.GetRequest())
+			}
 		}
 	}
 }
