@@ -116,7 +116,7 @@ func (stack *stack) search() (value interface{}, args []string) {
 		}
 	}
 	if err != nil {
-		if stack.history.Len() == 0 {
+		if stack.history.Len() == 0 || stack.node.prior == nil {
 			return nil, nil
 		}
 		stack.back()
