@@ -120,13 +120,7 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	collection := host.handlers[strings.ToUpper(r.Method)]
 	var run, args = host.global, []string{}
-	if collection == nil {
-		if r.Method != http.MethodGet {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(http.StatusText(http.StatusNotFound)))
-			return
-		}
-	} else {
+	if collection != nil {
 		var path = r.URL.Path
 		if host.conf.UserLowerLetter {
 			path = strings.ToLower(path)
