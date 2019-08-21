@@ -39,8 +39,12 @@ func (logger *AccessLogger) Invoke(ctx *webapi.Context, next webapi.HTTPHandler)
 	latency := time.Since(start)
 	clientIP, _, _ := net.SplitHostPort(strings.TrimSpace(ctx.GetRequest().RemoteAddr))
 	method := ctx.GetRequest().Method
+	code := 404
+	if ctx.StatusCode() > 0 {
+		code = ctx.StatusCode()
+	}
 	//采用自定义写文件方式
-	logger.accesslogger.Write("[%s]\t%s/%d\t%s -> %s\t%s", start.Format("2006-01-02 15:04:05"), method, ctx.StatusCode(), clientIP, path, latency)
+	logger.accesslogger.Write("[%s]\t%s/%d\t%s -> %s\t%s", start.Format("2006-01-02 15:04:05"), method, code, clientIP, path, latency)
 }
 
 type (
