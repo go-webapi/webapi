@@ -44,11 +44,12 @@ func (handler *StaticFileHandler) Invoke(ctx *webapi.Context, next webapi.HTTPHa
 	next(ctx)
 	if ctx.StatusCode() == 0 && ctx.GetRequest().Method == http.MethodGet {
 		filepath := ctx.GetRequest().URL.Path
-		if _, filename := path.Split(filepath); len(filename) > 0 || handler.listfolder {
-			if strings.Index(filepath, handler.address) == 0 {
-				ctx.GetRequest().URL.Path = strings.Replace(filepath, handler.address, "", 1)
-				handler.server.ServeHTTP(&respWriter{ctx: ctx}, ctx.GetRequest())
-			}
+		if _, filename := path.Split(filepath); len(filename) == 0 && !handler.listfolder {
+			filename += "index.html"
+		}
+		if strings.Index(filepath, handler.address) == 0 {
+			ctx.GetRequest().URL.Path = strings.Replace(filepath, handler.address, "", 1)
+			handler.server.ServeHTTP(&respWriter{ctx: ctx}, ctx.GetRequest())
 		}
 	}
 }
