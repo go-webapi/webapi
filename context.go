@@ -50,10 +50,10 @@ type (
 func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	var data []byte
 	if len(obj) > 0 && obj[0] != nil {
-		entity := reflect.ValueOf(obj[0])
-	begin:
+		entity := reflect.Indirect(reflect.ValueOf(obj[0]))
 		value := entity.Interface()
-		if kind := entity.Kind(); marshalableKinds[kind] {
+		_, isByte := value.([]byte)
+		if kind := entity.Kind(); !isByte && marshalableKinds[kind] {
 			//serializer is using for reply now.
 			//use deserializer to handle body data instead.
 			if ctx.Serializer == nil {
@@ -61,9 +61,6 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 				ctx.Serializer = Serializers["application/json"]
 			}
 			data, err = ctx.Serializer.Marshal(value)
-		} else if _, iserr := value.(error); !iserr && kind == reflect.Ptr {
-			entity = entity.Elem()
-			goto begin
 		} else {
 			switch value.(type) {
 			case []byte:
