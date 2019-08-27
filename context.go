@@ -50,27 +50,32 @@ type (
 func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	var data []byte
 	if len(obj) > 0 && obj[0] != nil {
-		entity := reflect.Indirect(reflect.ValueOf(obj[0]))
-		value := entity.Interface()
-		_, isByte := value.([]byte)
-		if kind := entity.Kind(); !isByte && marshalableKinds[kind] {
-			//serializer is using for reply now.
-			//use deserializer to handle body data instead.
-			if ctx.Serializer == nil {
-				//default is json.
-				ctx.Serializer = Serializers["application/json"]
-			}
-			data, err = ctx.Serializer.Marshal(value)
+		if _, isErr := obj[0].(error); isErr {
+			data = []byte(obj[0].(error).Error())
 		} else {
-			switch value.(type) {
-			case []byte:
-				data = value.([]byte)
-				break
-			case error:
-				data = []byte(value.(error).Error())
-				break
-			default:
-				data = []byte(fmt.Sprintf("%v", value))
+			entity := reflect.Indirect(reflect.ValueOf(obj[0]))
+			value := entity.Interface()
+			_, isByte := value.([]byte)
+			_, isRune := value.([]rune)
+			if kind := entity.Kind(); !isByte && !isRune && marshalableKinds[kind] {
+				//serializer is using for reply now.
+				//use deserializer to handle body data instead.
+				if ctx.Serializer == nil {
+					//default is json.
+					ctx.Serializer = Serializers["application/json"]
+				}
+				data, err = ctx.Serializer.Marshal(value)
+			} else {
+				switch value.(type) {
+				case []byte:
+					data = value.([]byte)
+					break
+				case []rune:
+					data = []byte(string(value.([]rune)))
+					break
+				default:
+					data = []byte(fmt.Sprintf("%v", value))
+				}
 			}
 		}
 		if err != nil {
