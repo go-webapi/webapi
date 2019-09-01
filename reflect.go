@@ -43,7 +43,9 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 				arguments = arguments[len(method.ContextArgs):]
 				//call init function with parameters which are provided by path(query is excluded)
 				if err := obj.Addr().MethodByName("Init").Call(preArgs)[0]; err.Interface() != nil {
-					ctx.Reply(http.StatusBadRequest, err.Interface().(error))
+					if ctx.statuscode == 0 {
+						ctx.Reply(http.StatusBadRequest, err.Interface().(error))
+					}
 					return
 				}
 			}
