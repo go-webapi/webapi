@@ -42,7 +42,7 @@ type (
 		Crypto         CryptoService
 		Deserializer   Serializer
 		Serializer     Serializer
-		errorCollector func(error) interface{}
+		errorCollector func([]byte) []byte
 	}
 )
 
