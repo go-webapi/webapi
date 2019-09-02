@@ -69,10 +69,10 @@ type (
 		errList  []error
 
 		//Stack data
-		basepath     string
-		global       httpHandler
-		mstack       []Middleware
-		ErrorHandler func([]byte) []byte
+		basepath      string
+		global        httpHandler
+		mstack        []Middleware
+		BeforeWriting func(int, []byte) []byte
 	}
 
 	//Config Configuration
@@ -104,19 +104,14 @@ func NewHost(conf Config, middlewares ...Middleware) (host *Host) {
 
 //ServeHTTP service http request
 func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if host.ErrorHandler == nil {
-		host.ErrorHandler = func(err []byte) []byte {
-			return err
-		}
-	}
 	if r.Body != nil {
 		defer r.Body.Close()
 	}
 	ctx := &Context{
-		w:              w,
-		r:              r,
-		Deserializer:   Serializers[strings.Split(r.Header.Get("Content-Type"), ";")[0]],
-		errorCollector: host.ErrorHandler,
+		w:             w,
+		r:             r,
+		Deserializer:  Serializers[strings.Split(r.Header.Get("Content-Type"), ";")[0]],
+		beforeWriting: host.BeforeWriting,
 	}
 	collection := host.handlers[strings.ToUpper(r.Method)]
 	var run, args = host.global, []string{}

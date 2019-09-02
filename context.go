@@ -39,10 +39,10 @@ type (
 		body         []byte
 		predecessors []Middleware
 
-		Crypto         CryptoService
-		Deserializer   Serializer
-		Serializer     Serializer
-		errorCollector func([]byte) []byte
+		Crypto        CryptoService
+		Deserializer  Serializer
+		Serializer    Serializer
+		beforeWriting func(int, []byte) []byte
 	}
 )
 
@@ -96,6 +96,9 @@ func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	if ctx.statuscode == 0 {
 		ctx.statuscode = httpstatus
 		ctx.w.WriteHeader(httpstatus)
+		if ctx.beforeWriting != nil && len(data) > 0 {
+			data = ctx.beforeWriting(ctx.statuscode, data)
+		}
 		if len(data) > 0 {
 			_, err = ctx.w.Write(data)
 		}
