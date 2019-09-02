@@ -74,7 +74,7 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 				}
 				obj, err := arg.Load(body, ctx.Deserializer)
 				if err != nil {
-					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+					ctx.Reply(http.StatusBadRequest, err)
 					return
 				}
 				val = *obj
@@ -88,7 +88,7 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 			obj, err := arg.Load(ctx.r.URL.Query(), nil)
 			if obj == nil {
 				if err != nil {
-					ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+					ctx.Reply(http.StatusBadRequest, err)
 				} else {
 					ctx.Reply(http.StatusBadRequest)
 				}
@@ -99,14 +99,14 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 			//it's a simple param from path(not query)
 			val = reflect.New(arg.Type).Elem()
 			if err := setValue(val, arguments[index]); err != nil {
-				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err))
+				ctx.Reply(http.StatusBadRequest, err)
 				return
 			}
 			index++
 		}
 		if checker := val.MethodByName("Check"); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == reflect.TypeOf((*error)(nil)).Elem() {
 			if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
-				ctx.Reply(http.StatusBadRequest, ctx.errorCollector(err.(error)))
+				ctx.Reply(http.StatusBadRequest, err)
 				return
 			}
 		}

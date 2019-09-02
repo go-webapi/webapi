@@ -72,7 +72,7 @@ type (
 		basepath     string
 		global       httpHandler
 		mstack       []Middleware
-		ErrorHandler func(error) interface{}
+		ErrorHandler func([]byte) []byte
 	}
 
 	//Config Configuration
@@ -105,8 +105,8 @@ func NewHost(conf Config, middlewares ...Middleware) (host *Host) {
 //ServeHTTP service http request
 func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if host.ErrorHandler == nil {
-		host.ErrorHandler = func(err error) interface{} {
-			return err.Error()
+		host.ErrorHandler = func(err []byte) []byte {
+			return err
 		}
 	}
 	if r.Body != nil {
