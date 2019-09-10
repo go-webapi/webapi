@@ -192,8 +192,14 @@ func setObj(value reflect.Value, queries url.Values) {
 			if len(name) == 0 {
 				name = ftyp.Name
 			}
+		detect:
 			if len(name) > 0 && name != "-" {
-				setValue(field, queries.Get(name))
+				if _, existed := (map[string][]string)(queries)[name]; existed {
+					setValue(field, queries.Get(name))
+				} else if lower := strings.ToLower(name); lower != name {
+					name = lower
+					goto detect
+				}
 			}
 		}
 	}
@@ -243,6 +249,10 @@ func setValue(value reflect.Value, data string) (err error) {
 			value.Set(reflect.MakeSlice(reflect.SliceOf(value.Type().Elem()), len(array), len(array)))
 			return setArray(value, array)
 		}
+		break
+	case reflect.Ptr:
+		value.Set(reflect.New(value.Type().Elem()))
+		err = setValue(value.Elem(), data)
 		break
 	}
 	return nil

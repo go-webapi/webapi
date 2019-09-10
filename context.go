@@ -52,8 +52,7 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	if len(obj) > 0 && obj[0] != nil {
 		if _, isErr := obj[0].(error); isErr {
 			data = []byte(obj[0].(error).Error())
-		} else {
-			entity := reflect.Indirect(reflect.ValueOf(obj[0]))
+		} else if entity := reflect.Indirect(reflect.ValueOf(obj[0])); entity.IsValid() {
 			value := entity.Interface()
 			_, isByte := value.([]byte)
 			_, isRune := value.([]rune)
