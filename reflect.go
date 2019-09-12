@@ -276,6 +276,9 @@ func setArray(value reflect.Value, data []string) (err error) {
 func setController(value reflect.Value, controller reflect.Value) bool {
 	for index := 0; index < value.NumField(); index++ {
 		field := value.Field(index)
+		if name := field.Type().Name(); len(name) > 0 && strings.ToLower(name[:1]) == name[:1] {
+			continue
+		}
 		if field.Kind() == reflect.Interface {
 			field.Set(controller)
 			return true
