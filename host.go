@@ -126,7 +126,9 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			args = arguments
 		}
 	}
-	run(ctx, args...)
+	if run != nil {
+		run(ctx, args...)
+	}
 	if ctx.statuscode == 0 {
 		ctx.Reply(http.StatusNotFound, http.StatusText(http.StatusNotFound))
 	}
@@ -184,12 +186,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		if alias, isAlias := interface{}(controller).(aliasController); isAlias {
 			//if controller can fit aliasController type, replace dictionary from basic to alias one
 			asideDict = internalAliasControllerMethods
-			aliasName := solveBasePath(alias.RouteAlias())[1:]
-			if len(aliasName) == 0 {
-				//cannot accpet empty alias if your controller is announced as aliasController
-				return errors.New("cannot set empty alias")
-			}
-			basePath += "/" + aliasName
+			basePath += solveBasePath(alias.RouteAlias())
 		} else {
 			//basic path should be type name
 			temp := typ
@@ -197,10 +194,15 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				//need element not reference
 				temp = temp.Elem()
 			}
-			if index := strings.Index(strings.ToLower(temp.Name()), "controller"); index > 0 && index+10 == len(temp.Name()) {
-				basePath += "/" + temp.Name()[0:index]
+			name := temp.Name()
+			if strings.ToLower(name) == "homecontroller" {
+				name = ""
 			} else {
-				basePath += "/" + temp.Name()
+				if index := strings.Index(strings.ToLower(name), "controller"); index > 0 && index+10 == len(name) {
+					basePath += "/" + name[0:index]
+				} else {
+					basePath += "/" + name
+				}
 			}
 		}
 	}
