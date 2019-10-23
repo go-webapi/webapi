@@ -242,7 +242,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		if method.Name == "Index" {
 			//if the method is named of 'Index'
 			//both "/Index" and "/" paths will assigned to this method
-			paths = append(paths, path)
+			paths = append(paths, path+"/")
 		}
 		for argindex := 1; argindex < inputArgsCount; argindex++ {
 			arg := method.Type.In(argindex)
