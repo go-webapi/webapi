@@ -60,6 +60,10 @@ type (
 		//HTTPMethodTagName Specify the specific method for the endpoint, default is "options"
 		HTTPMethodTagName string
 
+		//CustomisedPlaceholder Used to specify where the parameters should be in the URL. The specified string will quoted by {}.
+		//E.G.: param -> {param}
+		CustomisedPlaceholder string
+
 		//AutoReport This option will display route table after successful registration
 		DisableAutoReport bool
 	}
@@ -223,7 +227,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			Args:        make([]*param, 0),
 		}
 		var paths []string
-		var appendix string
+		var appendix []string
 		for argindex := 1; argindex < inputArgsCount; argindex++ {
 			arg := method.Type.In(argindex)
 			//If a parameter is a reference, it should be treated as the body structure
@@ -283,7 +287,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				ep.Args = append(ep.Args, &param{
 					Type: arg,
 				})
-				appendix += "/" + name
+				appendix = append(appendix, name)
 			}
 		}
 		if len(paths) == 0 {
@@ -295,7 +299,23 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			}
 		}
 		for index, path := range paths {
-			paths[index] = filepath.Join(path, appendix)
+			for {
+				where := strings.Index(path, "{"+host.conf.CustomisedPlaceholder+"}")
+				if len(appendix) != 0 && where != -1 {
+					path = strings.Replace(path, "{"+host.conf.CustomisedPlaceholder+"}", appendix[0], 1)
+					appendix = appendix[1:]
+				} else {
+					break
+				}
+			}
+			if len(appendix) == 0 {
+				if strings.Contains(path, "{"+host.conf.CustomisedPlaceholder+"}") {
+					path = ""
+				}
+				paths[index] = path
+			} else {
+				paths[index] = filepath.Join(path, strings.Join(appendix, "/"))
+			}
 		}
 		if host.conf.UserLowerLetter {
 			for index, p := range paths {
@@ -346,6 +366,9 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				host.handlers[httpmethod] = &endpoint{}
 			}
 			for index, p := range paths {
+				if len(p) == 0 {
+					continue
+				}
 				if err := host.handlers[httpmethod].Add(p, pipeline(handler, middlewares...)); err != nil {
 					if index > 0 {
 						//if the alias is already existed,
@@ -409,6 +432,9 @@ func (host *Host) initCheck() {
 	}
 	if len(host.conf.HTTPMethodTagName) == 0 {
 		host.conf.HTTPMethodTagName = "options"
+	}
+	if len(host.conf.CustomisedPlaceholder) == 0 {
+		host.conf.CustomisedPlaceholder = "param"
 	}
 	if host.handlers == nil {
 		host.handlers = map[string]*endpoint{}
