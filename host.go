@@ -69,16 +69,18 @@ type (
 		errList  []error
 
 		//Stack data
-		basepath      string
-		global        httpHandler
-		mstack        []Middleware
-		BeforeWriting func(int, []byte) []byte
+		basepath string
+		global   httpHandler
+		mstack   []Middleware
 	}
 
 	//Config Configuration
 	Config struct {
 		//UserLowerLetter Use lower letter in path
 		UserLowerLetter bool
+
+		//UseUnderscores This option will ignore the path after the last underscore
+		EnableCommentWithUnderscore bool
 
 		//AutoReport This option will display route table after successful registration
 		DisableAutoReport bool
@@ -108,10 +110,9 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 	}
 	ctx := &Context{
-		w:             w,
-		r:             r,
-		Deserializer:  Serializers[strings.Split(r.Header.Get("Content-Type"), ";")[0]],
-		beforeWriting: host.BeforeWriting,
+		w:            w,
+		r:            r,
+		Deserializer: Serializers[strings.Split(r.Header.Get("Content-Type"), ";")[0]],
 	}
 	collection := host.handlers[strings.ToUpper(r.Method)]
 	var run, args = host.global, []string{}
@@ -238,8 +239,14 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			Context:     method.Type.In(0),
 			Args:        make([]*param, 0),
 		}
-		paths := []string{path + "/" + method.Name}
-		if method.Name == "Index" {
+		var name = method.Name
+		if host.conf.EnableCommentWithUnderscore {
+			if arr := strings.Split(name, "_"); len(arr) > 1 {
+				name = strings.Join(arr[1:], "_")
+			}
+		}
+		paths := []string{path + "/" + name}
+		if name == "Index" {
 			//if the method is named of 'Index'
 			//both "/Index" and "/" paths will assigned to this method
 			paths = append(paths, path+"/")
