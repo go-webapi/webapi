@@ -248,7 +248,7 @@ func setValue(value reflect.Value, data string) (err error) {
 		err = setValue(value.Elem(), data)
 		break
 	}
-	return nil
+	return
 }
 
 //setArray Set array value to reflect.Value
