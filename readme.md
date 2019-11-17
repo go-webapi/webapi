@@ -38,22 +38,18 @@ func (article *Article) Show(query struct {
 
 > WebAPI follows the Golang principle, any accessible method (a function that begins with an uppercase letter) is registered as an API endpoint.
 
-The endpoint will be registered as `/article/show?guid=[guid]`. If there are multiple controllers handling different services, the controller alias can be specified by the `RouteAlias() string` method:
+The endpoint will be registered as `/article/show?guid=[guid]`. If there are multiple controllers handling different services, the controller alias can be specified by the `api` tag on any member of Controller:
 
 ```go
 type article struct {
-	webapi.Controller
+	webapi.Controller `api:"article"`
 	id uint
-}
-
-func (article *article) RouteAlias() string {
-	return "article"
 }
 ```
 
 Then both methods from `article` and `Article` will be registered under `/article`. However, it should be noted that such registrars need to avoid duplicate names. However, at runtime the WebAPI wo**n't** make a fatal warning(panic) for the duplicate name method.
 
-> When you use it, you can divide each business module into different people to complete. Finally, they can be easily integrated through `RouteAlias`.
+> When you use it, you can divide each business module into different people to complete. Finally, they can be easily integrated through `api` tag.
 
 ### Query/Body Auto-Serialization Support
 
@@ -70,6 +66,7 @@ You can see that the parameters are automatically placed in `query`. It also sup
 
 ```go
 func (article *article) Save(entity *struct {
+	conf       struct{} `api:"save"`
 	ID         uint
 	Title      string
 	Content    string
@@ -83,7 +80,7 @@ func (article *article) Save(entity *struct {
 }
 ```
 
-This method will be registered as `[POST] /article/{digits}/save`, because there is a `*struct{}` structure, so the default method is POST. However, the HTTP methods can be explicitly declared in the form of a private field of `method[HTTPMETHOD] struct`. Also use `curl`:
+This method will be registered as `[POST] /article/{digits}/save`, because there is a `*struct{}` structure, so the default method is POST. However, the HTTP methods can be explicitly declared in the form of `options` tag on any member of structure. Also use `curl`:
 
 ```go
 ~ curl -X "POST" "http://localhost:9527/article/123/save?time=2019-01-01" \
@@ -93,7 +90,7 @@ This method will be registered as `[POST] /article/{digits}/save`, because there
   "Content": "Awesome!"
 }'
 
-#[{"ID":123,"Title":"Hello WebAPI for Golang","Content":"Awesome!","CreateTime":"2019-01-01T00:00:00Z"}]
+#{"ID":123,"Title":"Hello WebAPI for Golang","Content":"Awesome!","CreateTime":"2019-01-01T00:00:00Z"}
 ```
 
 You can see that the time in the query was successfully accessed and assigned to the body. Please also note that the previously used `string` as the return value, but this node manually reply to the client using `.Reply(STATUSCODE, INTERFACE{})` to automatically process object.
@@ -147,14 +144,6 @@ Test with `curl`:
 > ⚠️ Attention
 >
 > This method can also be implemented by the method of `func (article *article) Index(id int)`. In this case, the two methods allow coexistence because the former is `/article/{string}` and the latter is `/article/{digits}`. Be aware of such issues when collaborating. If a duplicate registration node occurs, the controller will fail to register and prompt an error.
-
-### Midway Encryption Policy Support
-
-**Fully entrusted native encryption and decryption, compatible with key negotiation mechanism, even if the key is changed or not unique, only one setting, the pipeline plaintext ciphertext processing is more reliable, completely eliminate the possibility of confidential metadata leakage caused by negligence or accident Data security is safe and worry-free.**
-
-The encryption and decryption service relies on the context, and can specify the `CryptoService` in the context in the middleware to provide a unified encryption and decryption service, and to separate the encryption and decryption methods of the unrelated business, thereby improving the developer efficiency.
-
-The method can also be changed in the middle of use, that is, the module for encryption and decryption is dynamically replaceable.
 
 ## Performance
 
