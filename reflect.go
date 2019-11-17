@@ -26,9 +26,13 @@ type (
 )
 
 var types = struct {
-	Error reflect.Type
+	Error           reflect.Type
+	Controller      reflect.Type
+	AliasController reflect.Type
 }{
 	reflect.TypeOf((*error)(nil)).Elem(),
+	reflect.TypeOf((*Controller)(nil)).Elem(),
+	reflect.TypeOf((*aliasController)(nil)).Elem(),
 }
 
 func (method *function) Run(ctx *Context, arguments ...string) (objs []interface{}) {

@@ -12,24 +12,7 @@ import (
 
 var (
 	//internalControllerMethods A convenient dictionary of internal usage method fields
-	internalControllerMethods      = map[string]bool{}
-	internalAliasControllerMethods = map[string]bool{}
-
-	/*
-		reservedNamedStructure is used to indicate request forms
-		method[*] field is used to indicate how this function will be accessed (allowing multiple).
-
-		Mixed Mode:
-		method[*] explicitly specified as the highest priority, and
-		you can set a structure reference to set as body and then implicitly declared as POST.
-		If you would like to accpet multiple methods, you need use some method[*] to indicate forms.
-		E.g.: methodGET, methodPut (case insensitive, but you will get an error if you set a method which is not included in RESTful)
-	*/
-	reservedNamedStructure = struct {
-		Method string
-	}{
-		"method",
-	}
+	internalControllerMethods = map[string]bool{}
 
 	//supported http request methods dictionary
 	supportedMthods = map[string]bool{
@@ -47,18 +30,9 @@ var (
 
 func init() {
 	//generate method keyword dictionary from Controller
-	t := reflect.TypeOf(&struct {
-		Controller
-	}{})
+	t := types.Controller
 	for index := 0; index < t.NumMethod(); index++ {
 		internalControllerMethods[t.Method(index).Name] = true
-	}
-	//generate method keyword dictionary from aliasController
-	t = reflect.TypeOf(&struct {
-		aliasController
-	}{})
-	for index := 0; index < t.NumMethod(); index++ {
-		internalAliasControllerMethods[t.Method(index).Name] = true
 	}
 }
 
@@ -80,11 +54,11 @@ type (
 		//UserLowerLetter Use lower letter in path
 		UserLowerLetter bool
 
-		//EnableCommentWithDoubleUnderscores This option will ignore the path after the last underscore
-		EnableCommentWithUnderscore bool
+		//AliasTagName Replace the system rule name with the provided name, default is "api"
+		AliasTagName string
 
-		//EnablePathSeparationWithUnderscore This option will translate _ to / in the path
-		EnablePathSeparationWithUnderscore bool
+		//HTTPMethodTagName Specify the specific method for the endpoint, default is "options"
+		HTTPMethodTagName string
 
 		//AutoReport This option will display route table after successful registration
 		DisableAutoReport bool
@@ -185,20 +159,25 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 	}
 	val := reflect.ValueOf(controller)
 	typ := val.Type()
-	//select the default keyword dictionary
-	asideDict := internalControllerMethods
 	{
-		if alias, isAlias := interface{}(controller).(aliasController); isAlias {
-			//if controller can fit aliasController type, replace dictionary from basic to alias one
-			asideDict = internalAliasControllerMethods
-			basePath += solveBasePath(alias.RouteAlias())
-		} else {
-			//basic path should be type name
-			temp := typ
-			for temp.Kind() == reflect.Ptr {
-				//need element not reference
-				temp = temp.Elem()
+		temp := typ
+		for temp.Kind() == reflect.Ptr {
+			//need element not reference
+			temp = temp.Elem()
+		}
+		found := false
+		for index := 0; index < temp.NumField(); index++ {
+			field := temp.Field(index)
+			if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
+				name := strings.Split(alias, ",")[0]
+				if name != "" && name != "/" {
+					basePath += solveBasePath(name)
+				}
+				found = true
+				break
 			}
+		}
+		if !found {
 			name := temp.Name()
 			if strings.ToLower(name) == "homecontroller" {
 				name = ""
@@ -232,7 +211,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		var hasBody, hasQuery bool
 		methods, method, path := make(map[string]bool, 0), typ.Method(index), basePath
 		inputArgsCount := method.Type.NumIn()
-		if asideDict[method.Name] || (method.Name == "Init" && contextArgs != nil) {
+		if internalControllerMethods[method.Name] || (method.Name == "Init" && contextArgs != nil) {
 			//a special keyword flushed
 			continue
 		}
@@ -243,21 +222,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			Context:     method.Type.In(0),
 			Args:        make([]*param, 0),
 		}
-		var name = method.Name
-		if host.conf.EnableCommentWithUnderscore {
-			if arr := strings.Split(name, "_"); len(arr) > 1 {
-				name = strings.Join(arr[0:len(arr)-1], "_")
-			}
-		}
-		if host.conf.EnablePathSeparationWithUnderscore {
-			name = strings.Replace(name, "_", "/", -1)
-		}
-		paths := []string{path + "/" + name}
-		if name == "Index" {
-			//if the method is named of 'Index'
-			//both "/Index" and "/" paths will assigned to this method
-			paths = append(paths, path+"/")
-		}
+		var paths []string
 		for argindex := 1; argindex < inputArgsCount; argindex++ {
 			arg := method.Type.In(argindex)
 			//If a parameter is a reference, it should be treated as the body structure
@@ -270,19 +235,25 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 					//the flowing require element not reference
 					temp = temp.Elem()
 				}
-				if _, errorOccurred := temp.FieldByNameFunc(func(name string) bool {
-					if strings.Index(name, reservedNamedStructure.Method) == 0 {
-						//only field start with 'method' will be processed
-						if httpmethod := strings.ToUpper(strings.Replace(name, reservedNamedStructure.Method, "", 1)); supportedMthods[httpmethod] {
-							methods[httpmethod] = true
-						} else {
-							err = errors.New("cannot accept '" + httpmethod + "' method at method '" + method.Name + "' of '" + basePath + "'")
-							return true
+				for i := 0; i < temp.NumField(); i++ {
+					field := temp.Field(i)
+					if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
+						for _, route := range strings.Split(alias, ",") {
+							if route != "/" && route != "" {
+								paths = append(paths, filepath.Join(path, route))
+							} else {
+								paths = append(paths, path+"/")
+							}
 						}
 					}
-					return false
-				}); errorOccurred {
-					return err
+					if options, hasoptions := field.Tag.Lookup(host.conf.HTTPMethodTagName); hasoptions {
+						for _, option := range strings.Split(options, ",") {
+							option = strings.ToUpper(option)
+							if supportedMthods[option] {
+								methods[option] = true
+							}
+						}
+					}
 				}
 			}
 			if isBody {
@@ -314,6 +285,14 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				for index := range paths {
 					paths[index] = filepath.Join(paths[index], name)
 				}
+			}
+		}
+		if len(paths) == 0 {
+			paths = []string{path + "/" + method.Name}
+			if method.Name == "Index" {
+				//if the method is named of 'Index'
+				//both "/Index" and "/" paths will assigned to this method
+				paths = append(paths, path+"/")
 			}
 		}
 		if host.conf.UserLowerLetter {
@@ -423,6 +402,12 @@ func (host *Host) Errors() []error {
 }
 
 func (host *Host) initCheck() {
+	if len(host.conf.AliasTagName) == 0 {
+		host.conf.AliasTagName = "api"
+	}
+	if len(host.conf.HTTPMethodTagName) == 0 {
+		host.conf.HTTPMethodTagName = "options"
+	}
 	if host.handlers == nil {
 		host.handlers = map[string]*endpoint{}
 		host.errList = make([]error, 0)

@@ -39,11 +39,11 @@ func (article *Article) Show(query struct {
 
 > WebAPI 遵循 Golang 原则，但凡可访问的方法（大写字母开头的函数）均会被注册为 API 接入点。
 
-接入点会被注册为 `/article/show?guid=[guid]`，如果有多个控制器处理不同业务，那么可以通过 `RouteAlias() string` 方法来指定控制器别名：
+接入点会被注册为 `/article/show?guid=[guid]`，如果有多个控制器处理不同业务，那么可以通过 `api` 标签来指定控制器别名：
 
 ```go
 type article struct {
-	webapi.Controller
+	webapi.Controller `api:"article"`
 	id uint
 }
 
@@ -54,7 +54,7 @@ func (article *article) RouteAlias() string {
 
 然后不管在 `article` 还是 `Article` 下的方法均会注册到 `/article` 下。不过需要注意的是，此类注册器需要回避重名问题。不过在运行时 WebAPI **不**会针对重名方法做出致命警告 (panic)。
 
-> 使用时，不妨将各个业务模块细分给不同的人去完成。最后通过 `RouteAlias` 可以轻松将他们整合在一起。
+> 使用时，不妨将各个业务模块细分给不同的人去完成。最后通过 `api` 标签可以轻松将他们整合在一起。
 
 ### 查询/正文自动序列化与反序列化支持
 
@@ -71,6 +71,7 @@ func (article *article) RouteAlias() string {
 
 ```go
 func (article *article) Save(entity *struct {
+	conf       struct{} `api:"save"`
 	ID         uint
 	Title      string
 	Content    string
@@ -84,7 +85,7 @@ func (article *article) Save(entity *struct {
 }
 ```
 
-这个方法将会注册为 `[POST]  /article/{digits}/save`，因为存在 `*struct{}` 结构，所以默认为 POST，但是可以通过 `method[HTTPMETHOD] struct` 的私有字段的形式去显式声明 HTTP 方法。同样使用 `curl`：
+这个方法将会注册为 `[POST]  /article/{digits}/save`，因为存在 `*struct{}` 结构，所以默认为 POST，但是可以通过 `options` 标签去显式声明 HTTP 方法。同样使用 `curl`：
 
 ```go
 ~ curl -X "POST" "http://localhost:9527/article/123/save?time=2019-01-01" \
@@ -94,7 +95,7 @@ func (article *article) Save(entity *struct {
   "Content": "Awesome!"
 }'
 
-#[{"ID":123,"Title":"Hello WebAPI for Golang","Content":"Awesome!","CreateTime":"2019-01-01T00:00:00Z"}]
+#{"ID":123,"Title":"Hello WebAPI for Golang","Content":"Awesome!","CreateTime":"2019-01-01T00:00:00Z"}
 ```
 
 可以看到查询中的时间成功被访问并赋到了正文。也请留意到，不管是之前使用的 `string` 作为返回值，还是这个节点的，手动使用 `.Reply(STATUSCODE, INTERFACE{})` 都可以自动处理并回复给客户端。
@@ -148,14 +149,6 @@ func (article *Article) Index(guid string) string {
 > ⚠️ 注意
 >
 > 此方法也可以通过 `func (article *article) Index(id int)` 的方法实现。在本例中两个方法允许共存，因为前者为 `/article/{string}` 后者为 `/article/{digits}`。在协作的时候务必注意此类问题。如果出现重复注册节点，控制器将会注册失败并提示错误。
-
-### 中途加密策略支持
-
-**完全可托付的原生加密解密，兼容密钥协商机制，即使密钥变更或不唯一，只需一次设定，流水线明文密文处理更加可靠，完全杜绝因为疏忽或者意外造成的机密元数据泄露的可能，数据安全高枕无忧。**
-
-加解密服务依托于上下文，可以在中间件中指定上下文中的 `CryptoService` 来实现提供统一的加解密服务，将无关业务的加解密方法独立出去，提高开发者效率。
-
-方法亦可在使用中途更改，即此加密解密的模块是动态可替换的。
 
 ## 性能
 
