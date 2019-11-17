@@ -2,6 +2,7 @@ package webapi
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -253,10 +254,9 @@ func (ctx *Context) analyseParams(params []*param, arguments ...string) ([]refle
 	for _, arg := range params {
 		var val reflect.Value
 		if arg.isBody {
-			var body []byte
 			//load body structure from body with serializer(default will be JSON)
 			if ctx.Deserializer != nil {
-				body = ctx.Body()
+				var body = ctx.Body()
 				if ctx.BeforeReading != nil {
 					body = ctx.BeforeReading(body)
 				}
@@ -274,10 +274,7 @@ func (ctx *Context) analyseParams(params []*param, arguments ...string) ([]refle
 		} else if arg.isQuery {
 			obj, err := arg.Load(ctx.r.URL.Query(), nil)
 			if obj == nil {
-				if err == nil {
-					err = errors.New(http.StatusText(http.StatusBadRequest))
-				}
-				return nil, err
+				return nil, fmt.Errorf("%v", err)
 			}
 			val = (*obj).Addr()
 		} else {
@@ -288,15 +285,26 @@ func (ctx *Context) analyseParams(params []*param, arguments ...string) ([]refle
 			}
 			index++
 		}
-		if checker := val.MethodByName("Check"); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == types.Error {
-			if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
-				return nil, err.(error)
-			}
-		}
-		if arg.isQuery {
+		//run checker
+		if err := runChecker(val); err != nil {
+			return nil, err
+		} else if arg.isQuery {
 			val = val.Elem()
 		}
 		args = append(args, val)
 	}
 	return args, nil
+}
+
+//runChecker invoke Check function to validate transferring entity
+func runChecker(val reflect.Value, checkername ...string) (err error) {
+	if len(checkername) == 0 {
+		checkername = []string{"Check"}
+	}
+	if checker := val.MethodByName(checkername[0]); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == types.Error {
+		if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
+			return err.(error)
+		}
+	}
+	return nil
 }
