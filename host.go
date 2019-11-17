@@ -214,7 +214,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 	//check prefix request parameters
 	initFunc, existed := typ.MethodByName("Init")
 	var contextArgs []reflect.Type
-	if existed && (initFunc.Type.NumOut() == 1 && initFunc.Type.Out(0) == reflect.TypeOf((*error)(nil)).Elem()) {
+	if existed && (initFunc.Type.NumOut() == 1 && initFunc.Type.Out(0) == types.Error) {
 		contextArgs = []reflect.Type{}
 		//find out all the initialization parameters and record them.
 		for index := 1; index < initFunc.Type.NumIn(); index++ {
