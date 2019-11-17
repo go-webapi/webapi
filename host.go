@@ -79,8 +79,11 @@ type (
 		//UserLowerLetter Use lower letter in path
 		UserLowerLetter bool
 
-		//UseUnderscores This option will ignore the path after the last underscore
+		//EnableCommentWithDoubleUnderscores This option will ignore the path after the last underscore
 		EnableCommentWithUnderscore bool
+
+		//EnablePathSeparationWithUnderscore This option will translate _ to / in the path
+		EnablePathSeparationWithUnderscore bool
 
 		//AutoReport This option will display route table after successful registration
 		DisableAutoReport bool
@@ -242,8 +245,11 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		var name = method.Name
 		if host.conf.EnableCommentWithUnderscore {
 			if arr := strings.Split(name, "_"); len(arr) > 1 {
-				name = strings.Join(arr[1:], "_")
+				name = strings.Join(arr[0:len(arr)-1], "_")
 			}
+		}
+		if host.conf.EnablePathSeparationWithUnderscore {
+			name = strings.Replace(name, "_", "/", -1)
 		}
 		paths := []string{path + "/" + name}
 		if name == "Index" {
