@@ -24,6 +24,12 @@ type (
 	}
 )
 
+var types = struct {
+	Error reflect.Type
+}{
+	reflect.TypeOf((*error)(nil)).Elem(),
+}
+
 func (method *function) Run(ctx *Context, arguments ...string) (objs []interface{}) {
 	args := make([]reflect.Value, 0)
 	if method.Context != nil {
@@ -94,19 +100,6 @@ func (p *param) loadFromBytes(body []byte, serializer Serializer) (*reflect.Valu
 func (p *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
 	obj, callback := createObj(p.Type)
 	if len(queries) > 0 {
-		// for fieldIndex := 0; fieldIndex < objType.NumField(); fieldIndex++ {
-		// 	field := obj.Field(fieldIndex)
-		// 	if field.CanSet() {
-		// 		ftyp := objType.Field(fieldIndex)
-		// 		name := ftyp.Tag.Get("json")
-		// 		if len(name) == 0 {
-		// 			name = ftyp.Name
-		// 		}
-		// 		if len(name) > 0 && name != "-" {
-		// 			setValue(field, queries.Get(name))
-		// 		}
-		// 	}
-		// }
 		setObj(obj, queries)
 		obj = callback(obj)
 	} else {
@@ -232,6 +225,7 @@ func setController(value reflect.Value, controller reflect.Value) bool {
 	return false
 }
 
+//initController run init function
 func initController(obj reflect.Value, method *function, arguments ...string) ([]string, error) {
 	preArgs := []reflect.Value{}
 	if method.ContextArgs != nil {
@@ -252,6 +246,7 @@ func initController(obj reflect.Value, method *function, arguments ...string) ([
 	return arguments, nil
 }
 
+//analyseParams assign value to params
 func (ctx *Context) analyseParams(params []*param, arguments ...string) ([]reflect.Value, error) {
 	var index = 0
 	var args = []reflect.Value{}
@@ -261,8 +256,9 @@ func (ctx *Context) analyseParams(params []*param, arguments ...string) ([]refle
 			var body []byte
 			//load body structure from body with serializer(default will be JSON)
 			if ctx.Deserializer != nil {
-				if body == nil {
-					body = ctx.Body()
+				body = ctx.Body()
+				if ctx.BeforeReading != nil {
+					body = ctx.BeforeReading(body)
 				}
 				obj, err := arg.Load(body, ctx.Deserializer)
 				if err != nil {
@@ -292,7 +288,7 @@ func (ctx *Context) analyseParams(params []*param, arguments ...string) ([]refle
 			}
 			index++
 		}
-		if checker := val.MethodByName("Check"); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == reflect.TypeOf((*error)(nil)).Elem() {
+		if checker := val.MethodByName("Check"); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == types.Error {
 			if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
 				return nil, err.(error)
 			}

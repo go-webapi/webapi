@@ -144,9 +144,6 @@ func (ctx *Context) Body() []byte {
 		ctx.body, _ = ioutil.ReadAll(ctx.r.Body)
 		if ctx.body == nil {
 			ctx.body = []byte{}
-			if ctx.BeforeReading != nil {
-				ctx.body = ctx.BeforeReading(ctx.body)
-			}
 		}
 	}
 	return ctx.body
