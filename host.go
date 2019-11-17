@@ -223,6 +223,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			Args:        make([]*param, 0),
 		}
 		var paths []string
+		var appendix string
 		for argindex := 1; argindex < inputArgsCount; argindex++ {
 			arg := method.Type.In(argindex)
 			//If a parameter is a reference, it should be treated as the body structure
@@ -282,9 +283,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				ep.Args = append(ep.Args, &param{
 					Type: arg,
 				})
-				for index := range paths {
-					paths[index] = filepath.Join(paths[index], name)
-				}
+				appendix += "/" + name
 			}
 		}
 		if len(paths) == 0 {
@@ -294,6 +293,9 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				//both "/Index" and "/" paths will assigned to this method
 				paths = append(paths, path+"/")
 			}
+		}
+		for index, path := range paths {
+			paths[index] = filepath.Join(path, appendix)
 		}
 		if host.conf.UserLowerLetter {
 			for index, p := range paths {
