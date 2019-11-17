@@ -44,7 +44,7 @@ func SetupRecoveryHandler(handler ...func(string, string) string) (r *Recovery) 
 	return
 }
 
-//Invoke 前置件调用约定
+//Invoke 中间件调用约定
 func (r *Recovery) Invoke(ctx *webapi.Context, next webapi.HTTPHandler) {
 	if r.recoveryCollector == nil {
 		r.recoveryCollector = defaultRecoveryCollector

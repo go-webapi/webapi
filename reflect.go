@@ -29,25 +29,14 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 	if method.Context != nil {
 		obj, callback := createObj(method.Context)
 		if setController(obj, reflect.ValueOf(interface{}(ctx).(Controller))) {
-			preArgs := []reflect.Value{}
-			if method.ContextArgs != nil {
-				//means preconditions required or ctx parameter existed
-				for index, arg := range method.ContextArgs {
-					val := reflect.New(arg).Elem()
-					if err := setValue(val, arguments[index]); err != nil {
-						ctx.Reply(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
-						return
-					}
-					preArgs = append(preArgs, val)
+			var err error
+			//init controller
+			arguments, err = initController(obj, method, arguments...)
+			if err != nil {
+				if ctx.statuscode == 0 {
+					ctx.Reply(http.StatusBadRequest, err.Error())
 				}
-				arguments = arguments[len(method.ContextArgs):]
-				//call init function with parameters which are provided by path(query is excluded)
-				if err := obj.Addr().MethodByName("Init").Call(preArgs)[0]; err.Interface() != nil {
-					if ctx.statuscode == 0 {
-						ctx.Reply(http.StatusBadRequest, err.Interface().(error))
-					}
-					return
-				}
+				return
 			}
 		} else {
 			ctx.Reply(http.StatusNotFound)
@@ -55,61 +44,16 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 		}
 		args = append(args, callback(obj))
 	}
-	var index = 0
-	for _, arg := range method.Args {
-		var val reflect.Value
-		if arg.isBody {
-			var body []byte
-			//load body structure from body with serializer(default will be JSON)
-			if ctx.Deserializer != nil {
-				if body == nil {
-					body = ctx.Body()
-				}
-				obj, err := arg.Load(body, ctx.Deserializer)
-				if err != nil {
-					ctx.Reply(http.StatusBadRequest, err)
-					return
-				}
-				val = *obj
-			} else {
-				//if cannot found any suitable serializer,
-				//the brand new value will take to method to avoid nil ptr panic.
-				//body val won't read in this situation.
-				val = arg.New()
-			}
-		} else if arg.isQuery {
-			obj, err := arg.Load(ctx.r.URL.Query(), nil)
-			if obj == nil {
-				if err != nil {
-					ctx.Reply(http.StatusBadRequest, err)
-				} else {
-					ctx.Reply(http.StatusBadRequest)
-				}
-				return
-			}
-			val = (*obj).Addr()
-		} else {
-			//it's a simple param from path(not query)
-			val = reflect.New(arg.Type).Elem()
-			if err := setValue(val, arguments[index]); err != nil {
-				ctx.Reply(http.StatusBadRequest, err)
-				return
-			}
-			index++
+	//analyse the params with context instance
+	paramArgs, err := ctx.analyseParams(method.Args, arguments...)
+	if err != nil {
+		if ctx.statuscode == 0 {
+			ctx.Reply(http.StatusBadRequest, err.Error())
 		}
-		if checker := val.MethodByName("Check"); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == reflect.TypeOf((*error)(nil)).Elem() {
-			if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
-				ctx.Reply(http.StatusBadRequest, err)
-				return
-			}
-		}
-		if arg.isQuery {
-			val = val.Elem()
-		}
-		args = append(args, val)
+		return
 	}
 	//call the function
-	result := method.Function.Call(args)
+	result := method.Function.Call(append(args, paramArgs...))
 	objs = make([]interface{}, len(result))
 	for index, res := range result {
 		objs[index] = res.Interface()
@@ -286,4 +230,77 @@ func setController(value reflect.Value, controller reflect.Value) bool {
 		}
 	}
 	return false
+}
+
+func initController(obj reflect.Value, method *function, arguments ...string) ([]string, error) {
+	preArgs := []reflect.Value{}
+	if method.ContextArgs != nil {
+		//means preconditions required or ctx parameter existed
+		for index, arg := range method.ContextArgs {
+			val := reflect.New(arg).Elem()
+			if err := setValue(val, arguments[index]); err != nil {
+				return nil, errors.New(http.StatusText(http.StatusBadRequest))
+			}
+			preArgs = append(preArgs, val)
+		}
+		arguments = arguments[len(method.ContextArgs):]
+		//call init function with parameters which are provided by path(query is excluded)
+		if err := obj.Addr().MethodByName("Init").Call(preArgs)[0]; err.Interface() != nil {
+			return nil, err.Interface().(error)
+		}
+	}
+	return arguments, nil
+}
+
+func (ctx *Context) analyseParams(params []*param, arguments ...string) ([]reflect.Value, error) {
+	var index = 0
+	var args = []reflect.Value{}
+	for _, arg := range params {
+		var val reflect.Value
+		if arg.isBody {
+			var body []byte
+			//load body structure from body with serializer(default will be JSON)
+			if ctx.Deserializer != nil {
+				if body == nil {
+					body = ctx.Body()
+				}
+				obj, err := arg.Load(body, ctx.Deserializer)
+				if err != nil {
+					return nil, err
+				}
+				val = *obj
+			} else {
+				//if cannot found any suitable serializer,
+				//the brand new value will take to method to avoid nil ptr panic.
+				//body val won't read in this situation.
+				val = arg.New()
+			}
+		} else if arg.isQuery {
+			obj, err := arg.Load(ctx.r.URL.Query(), nil)
+			if obj == nil {
+				if err == nil {
+					err = errors.New(http.StatusText(http.StatusBadRequest))
+				}
+				return nil, err
+			}
+			val = (*obj).Addr()
+		} else {
+			//it's a simple param from path(not query)
+			val = reflect.New(arg.Type).Elem()
+			if err := setValue(val, arguments[index]); err != nil {
+				return nil, err
+			}
+			index++
+		}
+		if checker := val.MethodByName("Check"); checker.IsValid() && checker.Type().NumIn() == 0 && checker.Type().NumOut() == 1 && checker.Type().Out(0) == reflect.TypeOf((*error)(nil)).Elem() {
+			if err := checker.Call(make([]reflect.Value, 0))[0].Interface(); err != nil {
+				return nil, err.(error)
+			}
+		}
+		if arg.isQuery {
+			val = val.Elem()
+		}
+		args = append(args, val)
+	}
+	return args, nil
 }

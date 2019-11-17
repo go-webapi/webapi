@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 )
@@ -222,7 +223,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 			if err != nil {
 				return err
 			}
-			basePath += ("/" + name)
+			basePath = filepath.Join(basePath, name)
 			contextArgs = append(contextArgs, arg)
 		}
 	}
@@ -311,7 +312,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 					Type: arg,
 				})
 				for index := range paths {
-					paths[index] += ("/" + name)
+					paths[index] = filepath.Join(paths[index], name)
 				}
 			}
 		}

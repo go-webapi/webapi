@@ -40,6 +40,7 @@ func SetupStaticFileSupport(address string, folder string, displayDir ...bool) w
 	}
 }
 
+//Invoke 中间件调用约定
 func (handler *StaticFileHandler) Invoke(ctx *webapi.Context, next webapi.HTTPHandler) {
 	next(ctx)
 	if ctx.StatusCode() == 0 && ctx.GetRequest().Method == http.MethodGet {
