@@ -60,13 +60,6 @@ func (method *function) Run(ctx *Context, arguments ...string) (objs []interface
 		var val reflect.Value
 		if arg.isBody {
 			var body []byte
-			if ctx.Crypto != nil && len(ctx.Body()) > 0 {
-				//crypto service
-				//read and cache body info
-				//this operation will let body canot read any more so
-				//developer can usr ctx.Body() to get them instead reading
-				body, _ = ctx.Crypto.Decrypt(ctx.Body())
-			}
 			//load body structure from body with serializer(default will be JSON)
 			if ctx.Deserializer != nil {
 				if body == nil {

@@ -29,12 +29,6 @@ type (
 		Data() interface{}
 	}
 
-	//CryptoService Cryptography service
-	CryptoService interface {
-		Encrypt([]byte) []byte
-		Decrypt([]byte) ([]byte, error)
-	}
-
 	//Validator Validator for body and query structures
 	Validator interface {
 		Check() error

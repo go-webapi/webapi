@@ -39,10 +39,11 @@ type (
 		body         []byte
 		predecessors []Middleware
 
-		Crypto        CryptoService
-		Deserializer  Serializer
-		Serializer    Serializer
-		beforeWriting func(int, []byte) []byte
+		Deserializer Serializer
+		Serializer   Serializer
+
+		BeforeReading func([]byte) []byte
+		BeforeWriting func(int, []byte) []byte
 	}
 )
 
@@ -80,12 +81,6 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 		if err != nil {
 			return
 		}
-		if httpstatus < 300 && ctx.Crypto != nil {
-			//only if status is 2XX the data will be encrypted
-			data = ctx.Crypto.Encrypt(data)
-			//this design might not pretty good for all of situation,
-			//plan to change to a setting and give developer some choices in the future.
-		}
 	}
 	return ctx.Write(httpstatus, data)
 }
@@ -95,8 +90,8 @@ func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	if ctx.statuscode == 0 {
 		ctx.statuscode = httpstatus
 		ctx.w.WriteHeader(httpstatus)
-		if ctx.beforeWriting != nil && len(data) > 0 {
-			data = ctx.beforeWriting(ctx.statuscode, data)
+		if ctx.BeforeWriting != nil && len(data) > 0 {
+			data = ctx.BeforeWriting(ctx.statuscode, data)
 		}
 		if len(data) > 0 {
 			_, err = ctx.w.Write(data)
@@ -149,6 +144,9 @@ func (ctx *Context) Body() []byte {
 		ctx.body, _ = ioutil.ReadAll(ctx.r.Body)
 		if ctx.body == nil {
 			ctx.body = []byte{}
+			if ctx.BeforeReading != nil {
+				ctx.body = ctx.BeforeReading(ctx.body)
+			}
 		}
 	}
 	return ctx.body
