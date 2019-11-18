@@ -142,7 +142,7 @@ func (host *Host) Group(basepath string, register func(), middlewares ...Middlew
 	}
 	//处理基地址问题
 	host.mstack = append(host.mstack, middlewares...)
-	host.basepath = solveBasePath(basepath)
+	host.basepath = filepath.Join("", basepath)
 	register()
 }
 
@@ -150,7 +150,7 @@ func (host *Host) Group(basepath string, register func(), middlewares ...Middlew
 func (host *Host) Register(basePath string, controller Controller, middlewares ...Middleware) (err error) {
 	{
 		host.initCheck()
-		basePath = host.basepath + solveBasePath(basePath)
+		basePath = filepath.Join(host.basepath, basePath)
 		defer func() {
 			if err != nil {
 				host.errList = append(host.errList, err)
@@ -185,37 +185,10 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		if err != nil {
 			return
 		}
-		handler := func(ctx *Context, args ...string) {
-			//endpoint is constructed and executable
-			var reply = ep.Run(ctx, args...)
-			if ctx.statuscode == 0 {
-				//if status code is zero, means the reply didn't handle by method
-				if len(reply) > 0 {
-					//try to reply with the return value
-					response, isResp := reply[0].(Replyable)
-					if !isResp {
-						response = &Reply{
-							Status: http.StatusOK,
-							Body:   reply[0],
-						}
-					}
-					statusCode := response.StatusCode()
-					if statusCode == 0 {
-						statusCode = http.StatusOK
-						if response.Data() == nil {
-							statusCode = http.StatusNoContent
-						}
-					}
-					ctx.Reply(statusCode, response.Data())
-				} else {
-					//no info can give back to client
-					ctx.Reply(http.StatusNoContent)
-				}
-			}
-		}
 		for option, paths := range methods {
+			handler := ep.MakeHandler()
 			for i, path := range paths {
-				path, err = host.getMethodPath(filepath.Join(basePath, path), appendix)
+				path, err = host.finalMethodPath(filepath.Join(basePath, path), appendix)
 				if err != nil {
 					return
 				}
@@ -249,7 +222,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 func (host *Host) AddEndpoint(method string, path string, handler HTTPHandler, middlewares ...Middleware) (err error) {
 	{
 		host.initCheck()
-		path = host.basepath + solveBasePath(path)
+		path = filepath.Join(host.basepath, path)
 		defer func() {
 			if err != nil {
 				host.errList = append(host.errList, err)
@@ -338,16 +311,6 @@ func getReplacer(typ reflect.Type) (string, error) {
 	return name, nil
 }
 
-func solveBasePath(path string) string {
-	if len(path) == 0 || path[0] != '/' {
-		path = "/" + path
-	}
-	if len(path) > 0 && path[len(path)-1] == '/' {
-		path = path[:len(path)-1]
-	}
-	return path
-}
-
 func (host *Host) getBasePath(controller Controller) (basePath string) {
 	{
 		host.initCheck()
@@ -363,7 +326,7 @@ func (host *Host) getBasePath(controller Controller) (basePath string) {
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
 			name := strings.Split(alias, ",")[0]
 			if name != "" && name != "/" {
-				basePath += solveBasePath(name)
+				basePath += filepath.Join(name)
 			}
 			found = true
 			break
@@ -407,7 +370,7 @@ func getControllerArguments(controller Controller) ([]reflect.Type, string, erro
 
 func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflect.Type) (*function, map[string][]string, []string, error) {
 	var hasBody, hasQuery bool
-	inputArgsCount, methods := method.Type.NumIn(), map[string]bool{}
+	inputArgsCount := method.Type.NumIn()
 	ep := function{
 		//created function entity to ready the endpoint
 		Function:    method.Func,
@@ -416,39 +379,16 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 		Args:        make([]*param, 0),
 	}
 	var paths []string
+	var methods []string
 	var appendix []string
 	for argindex := 1; argindex < inputArgsCount; argindex++ {
-		arg, path := method.Type.In(argindex), ""
+		arg := method.Type.In(argindex)
 		//If a parameter is a reference, it should be treated as the body structure
 		isBody := arg.Kind() == reflect.Ptr
 		if isBody || arg.Kind() == reflect.Struct {
 			//these logics are test the request forms, it might be existed in
 			//both query and body structures
-			var temp = arg
-			for temp.Kind() == reflect.Ptr {
-				//the flowing require element not reference
-				temp = temp.Elem()
-			}
-			for i := 0; i < temp.NumField(); i++ {
-				field := temp.Field(i)
-				if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
-					for _, route := range strings.Split(alias, ",") {
-						if route != "/" && route != "" {
-							paths = append(paths, filepath.Join(path, route))
-						} else {
-							paths = append(paths, path+"/")
-						}
-					}
-				}
-				if options, hasoptions := field.Tag.Lookup(host.conf.HTTPMethodTagName); hasoptions {
-					for _, option := range strings.Split(options, ",") {
-						option = strings.ToUpper(option)
-						if supportedMthods[option] {
-							methods[option] = true
-						}
-					}
-				}
-			}
+			paths, methods = host.getMethodPath(arg)
 		}
 		if isBody {
 			if hasBody {
@@ -484,10 +424,10 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 	if len(methods) == 0 {
 		if hasBody {
 			//body existed might be POST
-			methods[http.MethodPost] = true
+			methods = []string{http.MethodPost}
 		} else {
 			//no body might be GET
-			methods[http.MethodGet] = true
+			methods = []string{http.MethodGet}
 		}
 	}
 	if len(paths) == 0 {
@@ -500,14 +440,14 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 	}
 	options := make(map[string][]string, len(methods))
 	var index = 0
-	for option := range methods {
+	for _, option := range methods {
 		options[option] = paths
 		index++
 	}
 	return &ep, options, appendix, nil
 }
 
-func (host *Host) getMethodPath(path string, appendix []string) (string, error) {
+func (host *Host) finalMethodPath(path string, appendix []string) (string, error) {
 	for {
 		where := strings.Index(path, "{"+host.conf.CustomisedPlaceholder+"}")
 		if len(appendix) != 0 && where != -1 {
@@ -527,6 +467,43 @@ func (host *Host) getMethodPath(path string, appendix []string) (string, error) 
 		path = strings.ToLower(path)
 	}
 	return path, nil
+}
+
+func (host *Host) getMethodPath(arg reflect.Type) (paths, options []string) {
+	//these logics are test the request forms, it might be existed in
+	//both query and body structures
+	for arg.Kind() == reflect.Ptr {
+		//the flowing require element not reference
+		arg = arg.Elem()
+	}
+	var methods = map[string]bool{}
+	for i := 0; i < arg.NumField(); i++ {
+		field := arg.Field(i)
+		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
+			for _, route := range strings.Split(alias, ",") {
+				if route != "/" && route != "" {
+					paths = append(paths, filepath.Join("", route))
+				} else {
+					paths = append(paths, "/")
+				}
+			}
+		}
+		if options, hasoptions := field.Tag.Lookup(host.conf.HTTPMethodTagName); hasoptions {
+			for _, option := range strings.Split(options, ",") {
+				option = strings.ToUpper(option)
+				if supportedMthods[option] {
+					methods[option] = true
+				}
+			}
+		}
+	}
+	options = make([]string, len(methods))
+	var index = 0
+	for option := range methods {
+		options[index] = option
+		index++
+	}
+	return
 }
 
 func smallerMethod(method string) string {
