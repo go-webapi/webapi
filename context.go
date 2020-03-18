@@ -108,8 +108,7 @@ func (ctx *Context) Redirect(addr string, httpstatus ...int) {
 		httpstatus = []int{http.StatusTemporaryRedirect}
 	}
 	ctx.statuscode = httpstatus[0]
-	ctx.w.Header().Set("Location", addr)
-	ctx.w.WriteHeader(ctx.statuscode)
+	http.Redirect(ctx.w, ctx.r, addr, httpstatus[0])
 }
 
 //SetCookies Set cookies
