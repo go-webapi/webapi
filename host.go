@@ -51,8 +51,8 @@ type (
 
 	//Config Configuration
 	Config struct {
-		//UserLowerLetter Use lower letter in path
-		UserLowerLetter bool
+		//UseLowerLetter Use lower letter in path
+		UseLowerLetter bool
 
 		//AliasTagName Replace the system rule name with the provided name, default is "api"
 		AliasTagName string
@@ -100,7 +100,7 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var run, args = host.global, []string{}
 	if collection != nil {
 		var path = r.URL.Path
-		if host.conf.UserLowerLetter {
+		if host.conf.UseLowerLetter {
 			path = strings.ToLower(path)
 		}
 		handler, arguments := collection.Search(path)
@@ -463,7 +463,7 @@ func (host *Host) finalMethodPath(path string, appendix []string) (string, error
 		}
 	}
 	path = filepath.Join(path, strings.Join(appendix, "/"))
-	if host.conf.UserLowerLetter {
+	if host.conf.UseLowerLetter {
 		path = strings.ToLower(path)
 	}
 	return path, nil
