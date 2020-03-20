@@ -152,7 +152,7 @@ func (stack *stack) next(node *endpoint) {
 
 func (stack *stack) back() {
 	stack.node = stack.node.prior
-	stack.current.times = 0
+	// stack.current.times = 0
 	stack.queue.PushFront(stack.current)
 	stack.args.Remove(stack.args.Back())
 	stack.current = stack.history.Remove(stack.history.Back()).(*keyword)

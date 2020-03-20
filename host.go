@@ -192,6 +192,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 				if err != nil {
 					return
 				}
+				path = filepath.ToSlash(path)
 				if _, existed := host.handlers[option]; !existed {
 					host.handlers[option] = &endpoint{}
 				}

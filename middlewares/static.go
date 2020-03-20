@@ -5,7 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/go-webapi/webapi"
+	"webapi"
 )
 
 type (
