@@ -131,6 +131,7 @@ func (host *Host) Use(middlewares ...Middleware) *Host {
 //Group Set prefix to endpoints
 func (host *Host) Group(basepath string, register func(), middlewares ...Middleware) {
 	{
+		host.initCheck()
 		if host.mstack == nil {
 			host.mstack = make([]Middleware, 0)
 		}
@@ -142,7 +143,7 @@ func (host *Host) Group(basepath string, register func(), middlewares ...Middlew
 	}
 	//处理基地址问题
 	host.mstack = append(host.mstack, middlewares...)
-	host.basepath = filepath.Join("", basepath)
+	host.basepath = filepath.Join(host.basepath, basepath)
 	register()
 }
 
@@ -162,7 +163,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		}
 	}
 	typ := reflect.TypeOf(controller)
-	basePath += host.getBasePath(controller)
+	basePath = filepath.Join(basePath, host.getBasePath(controller))
 	//check prefix request parameters
 	var contextArgs []reflect.Type
 	var ctxPath string
@@ -263,6 +264,9 @@ func (host *Host) initCheck() {
 	if len(host.conf.CustomisedPlaceholder) == 0 {
 		host.conf.CustomisedPlaceholder = "param"
 	}
+	if len(host.basepath) == 0 {
+		host.basepath = string(filepath.Separator)
+	}
 	if host.handlers == nil {
 		host.handlers = map[string]*endpoint{}
 		host.errList = make([]error, 0)
@@ -327,7 +331,7 @@ func (host *Host) getBasePath(controller Controller) (basePath string) {
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
 			name := strings.Split(alias, ",")[0]
 			if name != "" && name != "/" {
-				basePath += filepath.Join(name)
+				basePath = filepath.Join(basePath, name)
 			}
 			found = true
 			break
@@ -389,7 +393,9 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 		if isBody || arg.Kind() == reflect.Struct {
 			//these logics are test the request forms, it might be existed in
 			//both query and body structures
-			paths, methods = host.getMethodPath(arg)
+			argPaths, argMethods := host.getMethodPath(arg)
+			paths = append(paths, argPaths...)
+			methods = append(methods, argMethods...)
 		}
 		if isBody {
 			if hasBody {
