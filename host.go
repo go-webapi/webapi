@@ -326,7 +326,7 @@ func (host *Host) getBasePath(controller Controller) (basePath string) {
 		field := typ.Field(index)
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
 			name := strings.Split(alias, ",")[0]
-			if name != "" && name != "/" {
+			if name != "/" {
 				basePath += filepath.Join(name)
 			}
 			found = true
@@ -389,7 +389,9 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 		if isBody || arg.Kind() == reflect.Struct {
 			//these logics are test the request forms, it might be existed in
 			//both query and body structures
-			paths, methods = host.getMethodPath(arg)
+			argPaths, argMethods := host.getMethodPath(arg)
+			paths = append(paths, argPaths...)
+			methods = append(methods, argMethods...)
 		}
 		if isBody {
 			if hasBody {
