@@ -326,8 +326,8 @@ func (host *Host) getBasePath(controller Controller) (basePath string) {
 		field := typ.Field(index)
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
 			name := strings.Split(alias, ",")[0]
-			if name != "/" {
-				basePath += filepath.Join(name)
+			if name != "" && name != "/" {
+				basePath = filepath.Join(basePath, name)
 			}
 			found = true
 			break
