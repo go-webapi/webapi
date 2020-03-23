@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"webapi"
+	"github.com/go-webapi/webapi"
 )
 
 type (
