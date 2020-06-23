@@ -34,6 +34,13 @@ type (
 		Check() error
 	}
 
+	//ResponseWriter is a alternative for ResponseWriter Request
+	ResponseWriter interface {
+		Write(p []byte) (int, error)
+		Header() http.Header
+		WriteHeader(statusCode int)
+	}
+
 	//Serializer Serializer
 	Serializer interface {
 		Marshal(interface{}) ([]byte, error)
