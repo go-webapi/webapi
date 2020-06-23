@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 )
@@ -20,6 +21,9 @@ var (
 type (
 	jsonSerializer struct{}
 	formSerializer struct{}
+	responsewriter struct {
+		ctx *Context
+	}
 )
 
 func (*jsonSerializer) Marshal(obj interface{}) ([]byte, error) {
@@ -82,4 +86,17 @@ func (reply Reply) StatusCode() int {
 //Data Body
 func (reply Reply) Data() interface{} {
 	return reply.Body
+}
+
+func (w *responsewriter) Write(p []byte) (int, error) {
+	return w.ctx.w.Write(p)
+}
+
+func (w *responsewriter) Header() http.Header {
+	return w.ctx.w.Header()
+}
+
+func (w *responsewriter) WriteHeader(statusCode int) {
+	w.ctx.statuscode = statusCode
+	w.ctx.w.WriteHeader(statusCode)
 }

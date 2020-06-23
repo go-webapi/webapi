@@ -3,7 +3,6 @@ package webapi
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -134,8 +133,10 @@ func (ctx *Context) GetRequest() *http.Request {
 }
 
 //GetResponseWriter Get ResponseWriter as io.Writer to support stream write
-func (ctx *Context) GetResponseWriter() io.Writer {
-	return ctx.w
+func (ctx *Context) GetResponseWriter() ResponseWriter {
+	return &responsewriter{
+		ctx: ctx,
+	}
 }
 
 //Body The Body Bytes from Context
