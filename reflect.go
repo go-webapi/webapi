@@ -245,7 +245,7 @@ func setController(value reflect.Value, controller reflect.Value) bool {
 		if name := value.Type().Field(index).Name; len(name) > 0 && strings.ToLower(name[:1]) == name[:1] {
 			continue
 		}
-		if field.Kind() == reflect.Interface {
+		if field.Kind() == reflect.Interface && field.Type().AssignableTo(types.Controller) {
 			field.Set(controller)
 			return true
 		} else if field.Kind() == reflect.Ptr {
