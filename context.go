@@ -88,10 +88,10 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	if ctx.statuscode == 0 {
 		ctx.statuscode = httpstatus
-		ctx.w.WriteHeader(httpstatus)
 		if ctx.BeforeWriting != nil && len(data) > 0 {
 			data = ctx.BeforeWriting(ctx.statuscode, data)
 		}
+		ctx.w.WriteHeader(httpstatus)
 		if len(data) > 0 {
 			_, err = ctx.w.Write(data)
 		}

@@ -89,6 +89,11 @@ func (reply Reply) Data() interface{} {
 }
 
 func (w *responsewriter) Write(p []byte) (int, error) {
+	defer func() {
+		if w.ctx.statuscode == 0 {
+			w.ctx.statuscode = 200 //mark data has been transferred
+		}
+	}()
 	return w.ctx.w.Write(p)
 }
 
