@@ -76,29 +76,24 @@ func (method *function) MakeHandler() func(ctx *Context, args ...string) {
 	return func(ctx *Context, args ...string) {
 		//endpoint is constructed and executable
 		var reply = method.run(ctx, args...)
-		if ctx.statuscode == 0 {
+		if ctx.statuscode == 0 && len(reply) > 0 {
 			//if status code is zero, means the reply didn't handle by method
-			if len(reply) > 0 {
-				//try to reply with the return value
-				response, isResp := reply[0].(Replyable)
-				if !isResp {
-					response = &Reply{
-						Status: http.StatusOK,
-						Body:   reply[0],
-					}
+			//try to reply with the return value
+			response, isResp := reply[0].(Replyable)
+			if !isResp {
+				response = &Reply{
+					Status: http.StatusOK,
+					Body:   reply[0],
 				}
-				statusCode := response.StatusCode()
-				if statusCode == 0 {
-					statusCode = http.StatusOK
-					if response.Data() == nil {
-						statusCode = http.StatusNoContent
-					}
-				}
-				ctx.Reply(statusCode, response.Data())
-			} else {
-				//no info can give back to client
-				ctx.Reply(http.StatusNoContent)
 			}
+			statusCode := response.StatusCode()
+			if statusCode == 0 {
+				statusCode = http.StatusOK
+				if response.Data() == nil {
+					statusCode = http.StatusNoContent
+				}
+			}
+			ctx.Reply(statusCode, response.Data())
 		}
 	}
 }
