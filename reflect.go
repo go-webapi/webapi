@@ -26,13 +26,11 @@ type (
 )
 
 var types = struct {
-	Error           reflect.Type
-	Controller      reflect.Type
-	AliasController reflect.Type
+	Error      reflect.Type
+	Controller reflect.Type
 }{
 	reflect.TypeOf((*error)(nil)).Elem(),
 	reflect.TypeOf((*Controller)(nil)).Elem(),
-	reflect.TypeOf((*aliasController)(nil)).Elem(),
 }
 
 func (method *function) run(ctx *Context, arguments ...string) (objs []interface{}) {
@@ -76,29 +74,24 @@ func (method *function) MakeHandler() func(ctx *Context, args ...string) {
 	return func(ctx *Context, args ...string) {
 		//endpoint is constructed and executable
 		var reply = method.run(ctx, args...)
-		if ctx.statuscode == 0 {
+		if ctx.statuscode == 0 && len(reply) > 0 {
 			//if status code is zero, means the reply didn't handle by method
-			if len(reply) > 0 {
-				//try to reply with the return value
-				response, isResp := reply[0].(Replyable)
-				if !isResp {
-					response = &Reply{
-						Status: http.StatusOK,
-						Body:   reply[0],
-					}
+			//try to reply with the return value
+			response, isResp := reply[0].(Replyable)
+			if !isResp {
+				response = &Reply{
+					Status: http.StatusOK,
+					Body:   reply[0],
 				}
-				statusCode := response.StatusCode()
-				if statusCode == 0 {
-					statusCode = http.StatusOK
-					if response.Data() == nil {
-						statusCode = http.StatusNoContent
-					}
-				}
-				ctx.Reply(statusCode, response.Data())
-			} else {
-				//no info can give back to client
-				ctx.Reply(http.StatusNoContent)
 			}
+			statusCode := response.StatusCode()
+			if statusCode == 0 {
+				statusCode = http.StatusOK
+				if response.Data() == nil {
+					statusCode = http.StatusNoContent
+				}
+			}
+			ctx.Reply(statusCode, response.Data())
 		}
 	}
 }
@@ -146,6 +139,9 @@ func (p *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
 
 func setObj(value reflect.Value, queries url.Values) {
 	t := value.Type()
+	if t.Kind() != reflect.Struct {
+		return
+	}
 	for i := 0; i < value.NumField(); i++ {
 		field := value.Field(i)
 		if field.Kind() == reflect.Struct {
@@ -245,7 +241,7 @@ func setController(value reflect.Value, controller reflect.Value) bool {
 		if name := value.Type().Field(index).Name; len(name) > 0 && strings.ToLower(name[:1]) == name[:1] {
 			continue
 		}
-		if field.Kind() == reflect.Interface {
+		if field.Kind() == reflect.Interface && field.Type().AssignableTo(types.Controller) {
 			field.Set(controller)
 			return true
 		} else if field.Kind() == reflect.Ptr {
