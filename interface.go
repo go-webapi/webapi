@@ -14,12 +14,6 @@ type (
 		ResponseHeader() http.Header
 		Context() *Context
 	}
-
-	//aliasController Alias Controller statement
-	aliasController interface {
-		Controller
-		RouteAlias() string
-	}
 )
 
 type (
