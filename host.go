@@ -7,12 +7,20 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
 var (
 	//internalControllerMethods A convenient dictionary of internal usage method fields
 	internalControllerMethods = map[string]bool{}
+
+	bodyTypes = map[reflect.Kind]bool{
+		reflect.Slice: true,
+		reflect.Array: true,
+		reflect.Map:   true,
+		reflect.Ptr:   true,
+	}
 
 	//supported http request methods dictionary
 	supportedMthods = map[string]bool{
@@ -44,9 +52,9 @@ type (
 		errList  []error
 
 		//Stack data
-		basepath string
-		global   httpHandler
-		mstack   []Middleware
+		paths  []string
+		global httpHandler
+		mstack []Middleware
 	}
 
 	//Config Configuration
@@ -74,8 +82,6 @@ func NewHost(conf Config, middlewares ...Middleware) (host *Host) {
 	host = &Host{
 		handlers: map[string]*endpoint{},
 		conf:     conf,
-
-		basepath: "",
 		global:   pipeline(nil, middlewares...),
 		mstack:   middlewares,
 	}
@@ -119,9 +125,7 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 //Use Add middlewares into host
 func (host *Host) Use(middlewares ...Middleware) *Host {
-	if host.mstack == nil {
-		host.mstack = middlewares
-	} else {
+	if len(middlewares) > 0 {
 		host.mstack = append(host.mstack, middlewares...)
 	}
 	host.global = pipeline(host.global, middlewares...)
@@ -132,26 +136,29 @@ func (host *Host) Use(middlewares ...Middleware) *Host {
 func (host *Host) Group(basepath string, register func(), middlewares ...Middleware) {
 	{
 		host.initCheck()
-		if host.mstack == nil {
-			host.mstack = make([]Middleware, 0)
+		if len(basepath) > 0 && basepath[0] == '/' {
+			basepath = basepath[1:]
 		}
-		orginalBasepath, orginalStack := host.basepath, host.mstack
+		orginalPaths, orginalStack := host.paths, host.mstack
 		defer func() {
 			//还原栈
-			host.mstack, host.basepath = orginalStack, orginalBasepath
+			host.mstack, host.paths = orginalStack, orginalPaths
 		}()
 	}
 	//处理基地址问题
 	host.mstack = append(host.mstack, middlewares...)
-	host.basepath = filepath.Join(host.basepath, basepath)
+	host.paths = append(host.paths, basepath)
 	register()
 }
 
 //Register Register the controller with the host
-func (host *Host) Register(basePath string, controller Controller, middlewares ...Middleware) (err error) {
+func (host *Host) Register(basepath string, controller Controller, middlewares ...Middleware) (err error) {
+	var paths = host.paths
 	{
 		host.initCheck()
-		basePath = filepath.Join(host.basepath, basePath)
+		if basepath = formatPath(basepath); len(basepath) != 0 {
+			paths = append(host.paths, formatPath(basepath))
+		}
 		defer func() {
 			if err != nil {
 				host.errList = append(host.errList, err)
@@ -163,15 +170,15 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		}
 	}
 	typ := reflect.TypeOf(controller)
-	basePath = filepath.Join(basePath, host.getBasePath(controller))
+	paths = append(paths, host.getBasePath(controller)...)
 	//check prefix request parameters
 	var contextArgs []reflect.Type
-	var ctxPath string
-	contextArgs, ctxPath, err = getControllerArguments(controller)
+	var ctxPaths []string
+	contextArgs, ctxPaths, err = getControllerArguments(controller)
 	if err != nil {
 		return
 	}
-	basePath = filepath.Join(basePath, ctxPath)
+	paths = append(paths, ctxPaths...)
 	for index := 0; index < typ.NumMethod(); index++ {
 		//register all open methods.
 		method := typ.Method(index)
@@ -186,10 +193,10 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 		if err != nil {
 			return
 		}
-		for option, paths := range methods {
+		for option, endpoints := range methods {
 			handler := ep.MakeHandler()
-			for i, path := range paths {
-				path, err = host.finalMethodPath(filepath.Join(basePath, path), appendix)
+			for i, path := range endpoints {
+				path, err = host.finalMethodPath(strings.Join(append(paths, path), "/"), appendix)
 				if err != nil {
 					return
 				}
@@ -224,7 +231,7 @@ func (host *Host) Register(basePath string, controller Controller, middlewares .
 func (host *Host) AddEndpoint(method string, path string, handler HTTPHandler, middlewares ...Middleware) (err error) {
 	{
 		host.initCheck()
-		path = filepath.Join(host.basepath, path)
+		path = strings.Join(append(host.paths, formatPath(path, true)), "/")
 		defer func() {
 			if err != nil {
 				host.errList = append(host.errList, err)
@@ -237,6 +244,7 @@ func (host *Host) AddEndpoint(method string, path string, handler HTTPHandler, m
 	if len(host.mstack) > 0 {
 		middlewares = append(host.mstack, middlewares...)
 	}
+	path = "/" + path
 	err = host.handlers[method].Add(path, pipeline(func(context *Context, _ ...string) {
 		handler(context)
 	}, middlewares...))
@@ -263,9 +271,6 @@ func (host *Host) initCheck() {
 	}
 	if len(host.conf.CustomisedPlaceholder) == 0 {
 		host.conf.CustomisedPlaceholder = "param"
-	}
-	if len(host.basepath) == 0 {
-		host.basepath = string(filepath.Separator)
 	}
 	if host.handlers == nil {
 		host.handlers = map[string]*endpoint{}
@@ -316,7 +321,7 @@ func getReplacer(typ reflect.Type) (string, error) {
 	return name, nil
 }
 
-func (host *Host) getBasePath(controller Controller) (basePath string) {
+func (host *Host) getBasePath(controller Controller) (basepath []string) {
 	{
 		host.initCheck()
 	}
@@ -331,7 +336,7 @@ func (host *Host) getBasePath(controller Controller) (basePath string) {
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
 			name := strings.Split(alias, ",")[0]
 			if name != "" && name != "/" {
-				basePath = filepath.Join(basePath, name)
+				basepath = append(basepath, name)
 			}
 			found = true
 			break
@@ -339,21 +344,19 @@ func (host *Host) getBasePath(controller Controller) (basePath string) {
 	}
 	if !found {
 		name := typ.Name()
-		if strings.ToLower(name) == "homecontroller" {
-			name = ""
-		} else {
-			if index := strings.Index(strings.ToLower(name), "controller"); index > 0 && index+10 == len(name) {
-				basePath += "/" + name[0:index]
-			} else {
-				basePath += "/" + name
+		ctrlname := strings.ToLower(name)
+		if prefixLen := len(ctrlname) - 10; prefixLen > 0 && ctrlname != "homecontroller" && ctrlname != "home" {
+			if strings.HasSuffix(ctrlname, "controller") {
+				name = name[0:prefixLen]
 			}
+			basepath = append(basepath, name)
 		}
 	}
 	return
 }
 
-func getControllerArguments(controller Controller) ([]reflect.Type, string, error) {
-	var address string
+func getControllerArguments(controller Controller) ([]reflect.Type, []string, error) {
+	var address = make([]string, 0)
 	typ := reflect.TypeOf(controller)
 	initFunc, existed := typ.MethodByName("Init")
 	var contextArgs []reflect.Type
@@ -364,9 +367,9 @@ func getControllerArguments(controller Controller) ([]reflect.Type, string, erro
 			arg := initFunc.Type.In(index)
 			name, err := getReplacer(arg)
 			if err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
-			address = filepath.Join(address, name)
+			address = append(address, name)
 			contextArgs = append(contextArgs, arg)
 		}
 	}
@@ -389,7 +392,7 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 	for argindex := 1; argindex < inputArgsCount; argindex++ {
 		arg := method.Type.In(argindex)
 		//If a parameter is a reference, it should be treated as the body structure
-		isBody := arg.Kind() == reflect.Ptr
+		isBody := bodyTypes[arg.Kind()]
 		if isBody || arg.Kind() == reflect.Struct {
 			//these logics are test the request forms, it might be existed in
 			//both query and body structures
@@ -438,11 +441,11 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 		}
 	}
 	if len(paths) == 0 {
-		paths = []string{"/" + method.Name}
+		paths = []string{method.Name}
 		if method.Name == "Index" {
 			//if the method is named of 'Index'
 			//both "/Index" and "/" paths will assigned to this method
-			paths = append(paths, "/")
+			paths = append(paths, "")
 		}
 	}
 	options := make(map[string][]string, len(methods))
@@ -469,11 +472,13 @@ func (host *Host) finalMethodPath(path string, appendix []string) (string, error
 			return "", errors.New("cannot match " + path + " according to the params")
 		}
 	}
-	path = filepath.Join(path, strings.Join(appendix, "/"))
+	if suffix := strings.Join(appendix, "/"); len(suffix) > 0 {
+		path += "/" + suffix
+	}
 	if host.conf.UseLowerLetter {
 		path = strings.ToLower(path)
 	}
-	return path, nil
+	return "/" + path, nil
 }
 
 func (host *Host) getMethodPath(arg reflect.Type) (paths, options []string) {
@@ -483,6 +488,9 @@ func (host *Host) getMethodPath(arg reflect.Type) (paths, options []string) {
 		//the flowing require element not reference
 		arg = arg.Elem()
 	}
+	if arg.Kind() != reflect.Struct {
+		return
+	}
 	var methods = map[string]bool{}
 	for i := 0; i < arg.NumField(); i++ {
 		field := arg.Field(i)
@@ -491,7 +499,7 @@ func (host *Host) getMethodPath(arg reflect.Type) (paths, options []string) {
 				if route != "/" && route != "" {
 					paths = append(paths, filepath.Join("", route))
 				} else {
-					paths = append(paths, "/")
+					paths = append(paths, "")
 				}
 			}
 		}
@@ -518,4 +526,13 @@ func smallerMethod(method string) string {
 		method = method[:4]
 	}
 	return method
+}
+
+func formatPath(path string, skipsuffix ...bool) string {
+	path = regexp.MustCompile(`[\\/]{1,}`).ReplaceAllString(path, "/")
+	path = strings.TrimLeft(path, "/")
+	if len(skipsuffix) == 0 || !skipsuffix[0] {
+		path = strings.TrimRight(path, "/")
+	}
+	return path
 }

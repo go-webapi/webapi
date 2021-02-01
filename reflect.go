@@ -26,13 +26,11 @@ type (
 )
 
 var types = struct {
-	Error           reflect.Type
-	Controller      reflect.Type
-	AliasController reflect.Type
+	Error      reflect.Type
+	Controller reflect.Type
 }{
 	reflect.TypeOf((*error)(nil)).Elem(),
 	reflect.TypeOf((*Controller)(nil)).Elem(),
-	reflect.TypeOf((*aliasController)(nil)).Elem(),
 }
 
 func (method *function) run(ctx *Context, arguments ...string) (objs []interface{}) {
@@ -141,6 +139,9 @@ func (p *param) loadFromValues(queries url.Values) (*reflect.Value, error) {
 
 func setObj(value reflect.Value, queries url.Values) {
 	t := value.Type()
+	if t.Kind() != reflect.Struct {
+		return
+	}
 	for i := 0; i < value.NumField(); i++ {
 		field := value.Field(i)
 		if field.Kind() == reflect.Struct {
