@@ -156,7 +156,9 @@ func (host *Host) Register(basepath string, controller Controller, middlewares .
 	var paths = host.paths
 	{
 		host.initCheck()
-		paths = append(host.paths, formatPath(basepath))
+		if basepath = formatPath(basepath); len(basepath) != 0 {
+			paths = append(host.paths, formatPath(basepath))
+		}
 		defer func() {
 			if err != nil {
 				host.errList = append(host.errList, err)
