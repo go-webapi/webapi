@@ -454,7 +454,10 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 }
 
 func (host *Host) finalMethodPath(path string, appendix []string) (string, error) {
-	path = "/" + filepath.ToSlash(formatPath(path))
+	var endwithslash = strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\")
+	if path = "/" + filepath.ToSlash(formatPath(path)); endwithslash {
+		path += "/"
+	}
 	for {
 		where := strings.Index(path, "{"+host.conf.CustomisedPlaceholder+"}")
 		if len(appendix) != 0 && where != -1 {
@@ -494,7 +497,7 @@ func (host *Host) getMethodPath(arg reflect.Type) (paths, options []string) {
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
 			for _, route := range strings.Split(alias, ",") {
 				if route != "/" && route != "" {
-					paths = append(paths, filepath.Join("", route))
+					paths = append(paths, route)
 				} else {
 					paths = append(paths, "")
 				}
