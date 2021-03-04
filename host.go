@@ -153,12 +153,9 @@ func (host *Host) Group(basepath string, register func(), middlewares ...Middlew
 
 //Register Register the controller with the host
 func (host *Host) Register(basepath string, controller Controller, middlewares ...Middleware) (err error) {
-	var paths = host.paths
+	var paths = append(host.paths, basepath)
 	{
 		host.initCheck()
-		if basepath = formatPath(basepath); len(basepath) != 0 {
-			paths = append(host.paths, formatPath(basepath))
-		}
 		defer func() {
 			if err != nil {
 				host.errList = append(host.errList, err)
@@ -200,7 +197,6 @@ func (host *Host) Register(basepath string, controller Controller, middlewares .
 				if err != nil {
 					return
 				}
-				path = filepath.ToSlash(path)
 				if _, existed := host.handlers[option]; !existed {
 					host.handlers[option] = &endpoint{}
 				}
@@ -458,6 +454,7 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 }
 
 func (host *Host) finalMethodPath(path string, appendix []string) (string, error) {
+	path = "/" + filepath.ToSlash(formatPath(path))
 	for {
 		where := strings.Index(path, "{"+host.conf.CustomisedPlaceholder+"}")
 		if len(appendix) != 0 && where != -1 {
@@ -478,7 +475,7 @@ func (host *Host) finalMethodPath(path string, appendix []string) (string, error
 	if host.conf.UseLowerLetter {
 		path = strings.ToLower(path)
 	}
-	return "/" + path, nil
+	return path, nil
 }
 
 func (host *Host) getMethodPath(arg reflect.Type) (paths, options []string) {
