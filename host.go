@@ -167,7 +167,7 @@ func (host *Host) Register(basepath string, controller Controller, middlewares .
 		}
 	}
 	typ := reflect.TypeOf(controller)
-	paths = append(paths, host.getBasePath(controller)...)
+	paths = append(paths, host.getBasePath(controller))
 	//check prefix request parameters
 	var contextArgs []reflect.Type
 	var ctxPaths []string
@@ -193,7 +193,12 @@ func (host *Host) Register(basepath string, controller Controller, middlewares .
 		for option, endpoints := range methods {
 			handler := ep.MakeHandler()
 			for i, path := range endpoints {
-				path, err = host.finalMethodPath(strings.Join(append(paths, path), "/"), appendix)
+				if len(path) > 0 {
+					path = strings.Join(append(paths, path), "/")
+				} else {
+					path = strings.Join(paths, "/") + path
+				}
+				path, err = host.finalMethodPath(path, appendix)
 				if err != nil {
 					return
 				}
@@ -317,9 +322,10 @@ func getReplacer(typ reflect.Type) (string, error) {
 	return name, nil
 }
 
-func (host *Host) getBasePath(controller Controller) (basepath []string) {
+func (host *Host) getBasePath(controller Controller) (basepath string) {
 	{
 		host.initCheck()
+		basepath = "/"
 	}
 	typ := reflect.TypeOf(controller)
 	for typ.Kind() == reflect.Ptr {
@@ -330,10 +336,7 @@ func (host *Host) getBasePath(controller Controller) (basepath []string) {
 	for index := 0; index < typ.NumField(); index++ {
 		field := typ.Field(index)
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
-			name := strings.Split(alias, ",")[0]
-			if name != "" && name != "/" {
-				basepath = append(basepath, name)
-			}
+			basepath += strings.Split(alias, ",")[0]
 			found = true
 			break
 		}
@@ -341,12 +344,14 @@ func (host *Host) getBasePath(controller Controller) (basepath []string) {
 	if !found {
 		name := typ.Name()
 		ctrlname := strings.ToLower(name)
-		if prefixLen := len(ctrlname) - 10; prefixLen > 0 && ctrlname != "homecontroller" && ctrlname != "home" {
-			if strings.HasSuffix(ctrlname, "controller") {
-				name = name[0:prefixLen]
-			}
-			basepath = append(basepath, name)
+		if location := strings.LastIndex(ctrlname, "controller"); location != -1 {
+			name = name[:location]
+			ctrlname = ctrlname[:location]
 		}
+		if ctrlname == "home" {
+			name = ""
+		}
+		basepath += name
 	}
 	return
 }
@@ -441,7 +446,7 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 		if method.Name == "Index" {
 			//if the method is named of 'Index'
 			//both "/Index" and "/" paths will assigned to this method
-			paths = append(paths, "")
+			paths = append(paths, "/")
 		}
 	}
 	options := make(map[string][]string, len(methods))
@@ -495,13 +500,7 @@ func (host *Host) getMethodPath(arg reflect.Type) (paths, options []string) {
 	for i := 0; i < arg.NumField(); i++ {
 		field := arg.Field(i)
 		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
-			for _, route := range strings.Split(alias, ",") {
-				if route != "/" && route != "" {
-					paths = append(paths, route)
-				} else {
-					paths = append(paths, "")
-				}
-			}
+			paths = append(paths, strings.Split(alias, ",")...)
 		}
 		if options, hasoptions := field.Tag.Lookup(host.conf.HTTPMethodTagName); hasoptions {
 			for _, option := range strings.Split(options, ",") {
