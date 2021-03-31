@@ -455,7 +455,7 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 
 func (host *Host) finalMethodPath(path string, appendix []string) (string, error) {
 	var endwithslash = strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\")
-	if path = "/" + filepath.ToSlash(formatPath(path)); endwithslash {
+	if path = "/" + filepath.ToSlash(formatPath(path)); endwithslash && len(path) > 1 {
 		path += "/"
 	}
 	for {
