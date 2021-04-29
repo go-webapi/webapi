@@ -105,7 +105,7 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	collection := host.handlers[strings.ToUpper(r.Method)]
 	var run, args = host.global, []string{}
 	if collection != nil {
-		var path = r.URL.Path
+		var path = strings.TrimSpace(r.URL.Path)
 		if host.conf.UseLowerLetter {
 			path = strings.ToLower(path)
 		}

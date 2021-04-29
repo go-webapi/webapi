@@ -2,6 +2,7 @@ package webapi
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,17 +15,27 @@ var (
 	Serializers = map[string]Serializer{
 		"application/x-www-form-urlencoded": &formSerializer{},
 		"application/json":                  &jsonSerializer{},
+		"application/xml":                   &xmlSerializer{},
 		"":                                  &jsonSerializer{},
 	}
 )
 
 type (
+	xmlSerializer  struct{}
 	jsonSerializer struct{}
 	formSerializer struct{}
 	responsewriter struct {
 		ctx *Context
 	}
 )
+
+func (*xmlSerializer) Marshal(obj interface{}) ([]byte, error) {
+	return xml.Marshal(obj)
+}
+
+func (*xmlSerializer) Unmarshal(src []byte, obj interface{}) error {
+	return xml.Unmarshal(src, obj)
+}
 
 func (*jsonSerializer) Marshal(obj interface{}) ([]byte, error) {
 	return json.Marshal(obj)
