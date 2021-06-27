@@ -106,10 +106,10 @@ func (host *Host) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var run, args = host.global, []string{}
 	if collection != nil {
 		var path = strings.TrimSpace(r.URL.Path)
-		if host.conf.UseLowerLetter {
-			path = strings.ToLower(path)
-		}
-		handler, arguments := collection.Search(path)
+		// if host.conf.UseLowerLetter {
+		// 	path = strings.ToLower(path)
+		// }
+		handler, arguments := collection.Search(path, host.conf.UseLowerLetter)
 		if handler != nil {
 			run = handler.(httpHandler)
 			args = arguments

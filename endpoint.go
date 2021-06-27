@@ -29,6 +29,7 @@ type (
 		history  *list.List //[]*keyword
 		queue    *list.List //[]*keyword
 		args     *list.List
+		lower    bool
 		fallback func(string, int) (string, error)
 	}
 )
@@ -75,7 +76,7 @@ func (n *endpoint) Add(path string, value interface{}) (err error) {
 }
 
 //Search Get the endpoint value via keyword list
-func (n endpoint) search(path ...string) (value interface{}, args []string) {
+func (n endpoint) search(lower bool, path ...string) (value interface{}, args []string) {
 	if len(path) == 0 {
 		path = []string{""}
 	}
@@ -89,18 +90,23 @@ func (n endpoint) search(path ...string) (value interface{}, args []string) {
 		args:     list.New(),
 		queue:    queue,
 		node:     &n,
+		lower:    lower,
 		fallback: n.Fallback,
 	}).search()
 }
 
-func (n endpoint) Search(path string) (value interface{}, args []string) {
+func (n endpoint) Search(path string, lower bool) (value interface{}, args []string) {
 	if n.nodes == nil {
 		return nil, nil
 	}
-	if obj, existed := n.nodes[path]; existed {
+	var testPath = path
+	if lower {
+		testPath = strings.ToLower(testPath)
+	}
+	if obj, existed := n.nodes[testPath]; existed {
 		return obj.val, nil
 	}
-	return n.search(strings.Split(path, "/")[1:]...)
+	return n.search(lower, strings.Split(path, "/")[1:]...)
 }
 
 func (stack *stack) search() (value interface{}, args []string) {
@@ -108,6 +114,9 @@ func (stack *stack) search() (value interface{}, args []string) {
 		stack.fallback = defaultFallback
 	}
 	var key = stack.current.text
+	if stack.lower {
+		key = strings.ToLower(key)
+	}
 	var err error
 	for stack.current.times++; stack.current.times > 1; stack.current.times++ {
 		key, err = stack.fallback(stack.current.text, stack.current.times-1)
