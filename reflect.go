@@ -150,7 +150,7 @@ func setObj(value reflect.Value, queries url.Values) {
 		}
 		if field.CanSet() {
 			ftyp := t.Field(i)
-			name := ftyp.Tag.Get("json")
+			name := strings.Split(ftyp.Tag.Get("json"), ",")[0]
 			if len(name) == 0 {
 				name = ftyp.Name
 			}
