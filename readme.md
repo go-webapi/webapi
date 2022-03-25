@@ -99,6 +99,8 @@ You can see that the time in the query was successfully accessed and assigned to
 
 At the same time, the query and body structure support check, add the `Check() error` method to them to check the legality of the data before entering the business code, and isolate the defense code from the business.
 
+In the latest version of the code we have added semantics support, simply configure `semantics` at the `Controller` level to enable semantic registration points, for example if the method name above is changed to `PutSave` it will become a `Save` registration point for the `PUT` method.
+
 ### Routing Precondition (Pre-Parameterized Access) Support
 
 **The convergence controller handles the data category and sets up API access barriers. Provides matching-fallback and specific service controller pre-conditions that other routing services cannot provide, which isolates illegal access, reduces the probability of errors, improves service coding efficiency, and improves system robustness.**

@@ -16,10 +16,11 @@ var (
 	internalControllerMethods = map[string]bool{}
 
 	bodyTypes = map[reflect.Kind]bool{
-		reflect.Slice: true,
-		reflect.Array: true,
-		reflect.Map:   true,
-		reflect.Ptr:   true,
+		reflect.Slice:     true,
+		reflect.Array:     true,
+		reflect.Map:       true,
+		reflect.Ptr:       true,
+		reflect.Interface: true,
 	}
 
 	//supported http request methods dictionary
@@ -167,7 +168,8 @@ func (host *Host) Register(basepath string, controller Controller, middlewares .
 		}
 	}
 	typ := reflect.TypeOf(controller)
-	paths = append(paths, host.getBasePath(controller))
+	controllerbasepath, semantics := host.getBasePath(controller)
+	paths = append(paths, controllerbasepath)
 	//check prefix request parameters
 	var contextArgs []reflect.Type
 	var ctxPaths []string
@@ -186,7 +188,7 @@ func (host *Host) Register(basepath string, controller Controller, middlewares .
 		var ep *function
 		var methods map[string][]string
 		var appendix []string
-		ep, methods, appendix, err = host.getMethodArguments(method, contextArgs)
+		ep, methods, appendix, err = host.getMethodArguments(method, contextArgs, semantics)
 		if err != nil {
 			return
 		}
@@ -322,7 +324,7 @@ func getReplacer(typ reflect.Type) (string, error) {
 	return name, nil
 }
 
-func (host *Host) getBasePath(controller Controller) (basepath string) {
+func (host *Host) getBasePath(controller Controller) (basepath string, semantics bool) {
 	{
 		host.initCheck()
 		basepath = "/"
@@ -335,9 +337,16 @@ func (host *Host) getBasePath(controller Controller) (basepath string) {
 	found := false
 	for index := 0; index < typ.NumField(); index++ {
 		field := typ.Field(index)
-		if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
-			basepath += strings.Split(alias, ",")[0]
-			found = true
+		if !found {
+			if alias, hasalias := field.Tag.Lookup(host.conf.AliasTagName); hasalias {
+				basepath += strings.Split(alias, ",")[0]
+				found = true
+			}
+		}
+		if !semantics {
+			_, semantics = field.Tag.Lookup("semantics")
+		}
+		if found && semantics {
 			break
 		}
 	}
@@ -377,7 +386,7 @@ func getControllerArguments(controller Controller) ([]reflect.Type, []string, er
 	return contextArgs, address, nil
 }
 
-func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflect.Type) (*function, map[string][]string, []string, error) {
+func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflect.Type, semantics bool) (*function, map[string][]string, []string, error) {
 	var hasBody, hasQuery bool
 	inputArgsCount := method.Type.NumIn()
 	ep := function{
@@ -432,6 +441,21 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 	}
 	//If the method is not explicitly declared,
 	//then fall back to the default rule to register the node.
+	if len(paths) == 0 {
+		var detectedmethod, name string
+		if name = method.Name; semantics {
+			detectedmethod, name = detectMethod(method.Name)
+			if len(detectedmethod) > 0 {
+				methods = append(methods, detectedmethod)
+			}
+		}
+		paths = []string{name}
+		if strings.ToLower(name) == "index" {
+			//if the method is named of 'Index'
+			//both "/Index" and "/" paths will assigned to this method
+			paths = append(paths, "/")
+		}
+	}
 	if len(methods) == 0 {
 		if hasBody {
 			//body existed might be POST
@@ -441,14 +465,6 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 			methods = []string{http.MethodGet}
 		}
 	}
-	if len(paths) == 0 {
-		paths = []string{method.Name}
-		if method.Name == "Index" {
-			//if the method is named of 'Index'
-			//both "/Index" and "/" paths will assigned to this method
-			paths = append(paths, "/")
-		}
-	}
 	options := make(map[string][]string, len(methods))
 	var index = 0
 	for _, option := range methods {
@@ -456,6 +472,17 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 		index++
 	}
 	return &ep, options, appendix, nil
+}
+
+func detectMethod(name string) (method, path string) {
+	path = name
+	for supportedmethod := range supportedMthods {
+		if strings.HasPrefix(strings.ToLower(name), strings.ToLower(supportedmethod)) {
+			method, path = supportedmethod, name[len(supportedmethod):]
+			return
+		}
+	}
+	return
 }
 
 func (host *Host) finalMethodPath(path string, appendix []string) (string, error) {
