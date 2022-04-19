@@ -441,16 +441,16 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 	}
 	//If the method is not explicitly declared,
 	//then fall back to the default rule to register the node.
-	if len(paths) == 0 {
-		var detectedmethod, name string
-		if name = method.Name; semantics {
-			detectedmethod, name = detectMethod(method.Name)
-			if len(detectedmethod) > 0 {
-				methods = append(methods, detectedmethod)
-			}
+	var detectedmethod, detectedname string
+	if semantics {
+		detectedmethod, detectedname = detectMethod(method.Name)
+		if len(detectedmethod) > 0 {
+			methods = append(methods, detectedmethod)
 		}
-		paths = []string{name}
-		if strings.ToLower(name) == "index" {
+	}
+	if len(paths) == 0 {
+		paths = []string{detectedname}
+		if strings.ToLower(detectedname) == "index" {
 			//if the method is named of 'Index'
 			//both "/Index" and "/" paths will assigned to this method
 			paths = append(paths, "/")
