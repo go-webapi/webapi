@@ -441,7 +441,7 @@ func (host *Host) getMethodArguments(method reflect.Method, contextArgs []reflec
 	}
 	//If the method is not explicitly declared,
 	//then fall back to the default rule to register the node.
-	var detectedmethod, detectedname string
+	var detectedmethod, detectedname = "", method.Name
 	if semantics {
 		detectedmethod, detectedname = detectMethod(method.Name)
 		if len(detectedmethod) > 0 {
