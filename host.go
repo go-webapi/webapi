@@ -169,15 +169,17 @@ func (host *Host) Register(basepath string, controller Controller, middlewares .
 	}
 	typ := reflect.TypeOf(controller)
 	controllerbasepath, semantics := host.getBasePath(controller)
-	paths = append(paths, controllerbasepath)
 	//check prefix request parameters
 	var contextArgs []reflect.Type
 	var ctxPaths []string
 	contextArgs, ctxPaths, err = getControllerArguments(controller)
+	if err == nil {
+		controllerbasepath, _ = host.finalMethodPath(controllerbasepath, ctxPaths)
+	}
 	if err != nil {
 		return
 	}
-	paths = append(paths, ctxPaths...)
+	paths = append(paths, controllerbasepath)
 	for index := 0; index < typ.NumMethod(); index++ {
 		//register all open methods.
 		method := typ.Method(index)
