@@ -37,12 +37,20 @@ func (*xmlSerializer) Unmarshal(src []byte, obj interface{}) error {
 	return xml.Unmarshal(src, obj)
 }
 
+func (*xmlSerializer) ContentType() string {
+	return "application/xml; charset=utf-8"
+}
+
 func (*jsonSerializer) Marshal(obj interface{}) ([]byte, error) {
 	return json.Marshal(obj)
 }
 
 func (*jsonSerializer) Unmarshal(src []byte, obj interface{}) error {
 	return json.Unmarshal(src, obj)
+}
+
+func (*jsonSerializer) ContentType() string {
+	return "application/json; charset=utf-8"
 }
 
 func (*formSerializer) Marshal(obj interface{}) ([]byte, error) {
@@ -83,7 +91,11 @@ func (*formSerializer) Unmarshal(src []byte, obj interface{}) error {
 	return err
 }
 
-//Reply Default implementation of Response
+func (*formSerializer) ContentType() string {
+	return "application/x-www-form-urlencoded; charset=utf-8"
+}
+
+// Reply Default implementation of Response
 type Reply struct {
 	Status int
 	Body   interface{}

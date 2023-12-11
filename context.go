@@ -64,6 +64,9 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 					ctx.Serializer = Serializers["application/json"]
 				}
 				data, err = ctx.Serializer.Marshal(value)
+				if len(ctx.w.Header().Get("Content-Type")) == 0 {
+					ctx.w.Header().Set("Content-Type", ctx.Serializer.ContentType())
+				}
 			} else {
 				switch value.(type) {
 				case []byte:
