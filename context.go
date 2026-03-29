@@ -3,7 +3,7 @@ package webapi
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -46,7 +46,7 @@ type (
 	}
 )
 
-//Reply Reply to client with any data which can be marshaled into bytes if not bytes or string
+// Reply Reply to client with any data which can be marshaled into bytes if not bytes or string
 func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	var data []byte
 	if len(obj) > 0 && obj[0] != nil {
@@ -87,7 +87,7 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 	return ctx.Write(httpstatus, data)
 }
 
-//Write Write to response(only for once)
+// Write Write to response(only for once)
 func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	if ctx.statuscode == 0 {
 		ctx.statuscode = httpstatus
@@ -104,7 +104,7 @@ func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	return
 }
 
-//Redirect Jump to antoher url
+// Redirect Jump to antoher url
 func (ctx *Context) Redirect(addr string, httpstatus ...int) {
 	if len(httpstatus) == 0 || !(httpstatus[0] > 299 && httpstatus[0] < 400) {
 		httpstatus = []int{http.StatusTemporaryRedirect}
@@ -113,47 +113,50 @@ func (ctx *Context) Redirect(addr string, httpstatus ...int) {
 	http.Redirect(ctx.w, ctx.r, addr, httpstatus[0])
 }
 
-//SetCookies Set cookies
+// SetCookies Set cookies
 func (ctx *Context) SetCookies(cookies ...*http.Cookie) {
 	for _, cookie := range cookies {
 		http.SetCookie(ctx.w, cookie)
 	}
 }
 
-//ResponseHeader Response Header
+// ResponseHeader Response Header
 func (ctx *Context) ResponseHeader() http.Header {
 	return ctx.w.Header()
 }
 
-//Context Get Context
+// Context Get Context
 func (ctx *Context) Context() *Context {
 	return ctx
 }
 
-//GetRequest Get Request from Context
+// GetRequest Get Request from Context
 func (ctx *Context) GetRequest() *http.Request {
 	return ctx.r
 }
 
-//GetResponseWriter Get ResponseWriter as io.Writer to support stream write
+// GetResponseWriter Get ResponseWriter as io.Writer to support stream write
 func (ctx *Context) GetResponseWriter() ResponseWriter {
 	return &responsewriter{
 		ctx: ctx,
 	}
 }
 
-//Body The Body Bytes from Context
+// Body The Body Bytes from Context
 func (ctx *Context) Body() []byte {
 	if ctx.r.Body != nil && ctx.body == nil {
-		ctx.body, _ = ioutil.ReadAll(ctx.r.Body)
+		ctx.body, _ = io.ReadAll(ctx.r.Body)
 		if ctx.body == nil {
 			ctx.body = []byte{}
+		}
+		if ctx.BeforeReading != nil {
+			ctx.body = ctx.BeforeReading(ctx.body)
 		}
 	}
 	return ctx.body
 }
 
-//StatusCode Context Status Code
+// StatusCode Context Status Code
 func (ctx *Context) StatusCode() int {
 	return ctx.statuscode
 }
