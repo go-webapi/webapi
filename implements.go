@@ -113,11 +113,11 @@ func (reply Reply) Data() interface{} {
 
 func (w *responsewriter) Write(p []byte) (int, error) {
 	defer func() {
-		if w.ctx.statuscode == 0 {
+		if w.ctx.statuscode == 0 && w.ctx.BeforeWriting == nil {
 			w.ctx.statuscode = 200 //mark data has been transferred
 		}
 	}()
-	return w.ctx.w.Write(p)
+	return w.ctx.write(p)
 }
 
 func (w *responsewriter) Header() http.Header {

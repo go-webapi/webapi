@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -35,6 +36,7 @@ type (
 		statuscode   int
 		w            http.ResponseWriter
 		r            *http.Request
+		buffer       *bytes.Buffer
 		body         []byte
 		predecessors []Middleware
 
@@ -45,6 +47,17 @@ type (
 		BeforeWriting func(int, []byte) []byte
 	}
 )
+
+func (ctx *Context) write(data []byte) (int, error) {
+	if ctx.BeforeWriting != nil {
+		if ctx.buffer == nil {
+			ctx.buffer = &bytes.Buffer{}
+		}
+		return ctx.buffer.Write(data)
+	} else {
+		return ctx.w.Write(data)
+	}
+}
 
 // Reply Reply to client with any data which can be marshaled into bytes if not bytes or string
 func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
@@ -91,8 +104,11 @@ func (ctx *Context) Reply(httpstatus int, obj ...interface{}) (err error) {
 func (ctx *Context) Write(httpstatus int, data []byte) (err error) {
 	if ctx.statuscode == 0 {
 		ctx.statuscode = httpstatus
-		if ctx.BeforeWriting != nil && len(data) > 0 {
-			data = ctx.BeforeWriting(ctx.statuscode, data)
+		if ctx.BeforeWriting != nil {
+			if len(data) > 0 {
+				ctx.write(data)
+			}
+			data = ctx.BeforeWriting(ctx.statuscode, ctx.buffer.Bytes())
 		}
 		ctx.w.WriteHeader(httpstatus)
 		if len(data) > 0 {
