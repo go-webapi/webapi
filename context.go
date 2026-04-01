@@ -167,6 +167,7 @@ func (ctx *Context) Body() []byte {
 		}
 		if ctx.BeforeReading != nil {
 			ctx.body = ctx.BeforeReading(ctx.body)
+			ctx.BeforeReading = nil
 		}
 	}
 	return ctx.body
